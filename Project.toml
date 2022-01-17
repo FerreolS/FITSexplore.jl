@@ -1,0 +1,9 @@
+name = "FITSexplore"
+uuid = "8adab973-ac17-4ec6-8b81-43cd6f4779d2"
+authors = ["Ferréol Soulez <ferreol.soulez@univ-lyon1.fr>"]
+version = "0.1.0"
+
+[deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+EasyFITS = "a977f4a2-36a7-4172-89e7-19c2726f82e5"
+FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
