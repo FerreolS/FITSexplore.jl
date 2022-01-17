@@ -28,7 +28,7 @@ function Base.endswith(chain::Union{String,Vector{String}}, pattern::Vector{Stri
 		end
 	end
 	return false
-en
+end
 
 """
 	endswith(chain::Vector{String}, pattern::String)
