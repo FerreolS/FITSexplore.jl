@@ -82,6 +82,20 @@ me@host:~$ FITSexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 /path/to/folder/file8.fits.Z
 ```
 
+### Other examples
+
+* Adding a keyword value in the filename:
+
+```console
+me@host:~$ FITSexplore -k "ESO DPR TYPE" | awk  '{system("mv "$1" "$2"_"$1)}'
+````
+
+* Displaying the size of files of a given type:
+
+```console
+me@host:~$ ls -lh $(FITSexplore -f "ESO DPR TYPE" "DARK" -r /path/to/folder)
+````
+
 ## Installation
 
 * Install the unregistered Julia package FITSexplore.jl.
