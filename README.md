@@ -9,7 +9,7 @@ Simple command line script to explore FITS files content.
 #### Without optional argument
 
 it will display the name and the type of all HDU
-contained in the files TARGET.
+contained in the files `TARGET`. The `TARGET` can contain any files with extension : .fits, .fits.gz, fits.Z, .oifits
 
 ```console
 me@host:~$ FITSexplore GRAVI.fits.Z
@@ -33,7 +33,7 @@ Recursively explores entire directories given by TARGET. If no TARGET is given i
 
 #### -d, --header
 
-Display the FITS header of the TARGET
+Display the FITS header of the `TARGET`
 
 ```console
 me@host:~$ FITSexplore -d file.fits

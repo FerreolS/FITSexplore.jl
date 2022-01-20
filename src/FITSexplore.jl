@@ -8,7 +8,7 @@ module FITSexplore
 
 using FITSIO, EasyFITS, ArgParse
 
-const suffixes = [".fits", ".fits.gz","fits.Z",".oifits"]
+const suffixes = [".fits", ".fits.gz","fits.Z",".oifits",".oifits.gz",".oifits.Z"]
 
 
 
