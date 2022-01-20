@@ -93,12 +93,17 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String} )
 			if endswith(filename,suffixes)
 				header  = read(FitsHeader, filename)
 				str = ""
+				iskeyword = true
 				for key in keywords
 					if haskey(header,key)
 						str = str * " \t " * string(header[key])
+					else
+						iskeyword = false
 					end
 				end
-				println(filename ," \t ", str)
+				if iskeyword
+					println(filename ," \t ", str)
+				end
 			end
 		end
 	end
@@ -122,11 +127,12 @@ end
 function main(args)
 
     settings = ArgParseSettings(prog = "FITSexplore",
-						 version = @project_version,
+						 #version = @project_version,
+						 version = "0.1",
 						 add_version = true)
 
 	settings.description =  "Simple tool to explore the content of FITS files.\n\n"*
-							"Without any argument, it will display the name and the type of all HDU contained in the file FILENAME."
+							"Without any argument, it will display the name and the type of all HDU contained in the files TARGET."
     @add_arg_table! settings begin
 		"--header", "-d"
 			help = "header"
@@ -146,21 +152,21 @@ function main(args)
 		"--recursive", "-r"
 			help = "Recursively explore entire directories."
 			action = :store_true
-		"FILENAMES"
+		"TARGET"
 			nargs = '*'
 			arg_type = String
-            help = "List of all FILENAMES to explore. In conjunction with -r FILENAMES can contain directories."
+            help = "List of all TARGET to explore. In conjunction with -r TARGET can contain directories."
 			default = ["."]
     end
 
     parsed_args = parse_args(args, settings)
 
-	args =parsed_args["FILENAMES"];
+	args =parsed_args["TARGET"];
 
 	files = Vector{String}()
 	for arg in args
 		if isdir(arg) && parsed_args["recursive"]
-			files =  vcat(files,[root*"/"*filename for (root, dirs, filenames) in walkdir(arg) for filename in filenames  ])
+			files =  vcat(files,[root*"/"*filename for (root, dirs, TARGET) in walkdir(arg) for filename in TARGET  ])
 		else
 			files =  vcat(files,arg)
 		end
