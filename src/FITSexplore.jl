@@ -6,7 +6,7 @@ Package `FITSexplore`
 
 module FITSexplore
 
-using FITSIO, EasyFITS,ArgParse
+using FITSIO, EasyFITS, ArgParse
 
 const suffixes = [".fits", ".fits.gz","fits.Z",".oifits"]
 
@@ -121,37 +121,42 @@ end
 
 function main(args)
 
-    s = ArgParseSettings("Example 2 for argparse.jl: " *  # description
-                         "flags, options help, " *
-                         "required arguments.")
+    settings = ArgParseSettings(prog = "FITSexplore",
+						 version = @project_version,
+						 add_version = true)
 
-    @add_arg_table! s begin
+	settings.description =  "Simple tool to explore the content of FITS files.\n\n"*
+							"Without any argument, it will display the name and the type of all HDU contained in the file FILENAME."
+    @add_arg_table! settings begin
+		"--header", "-d"
+			help = "header"
+			action = :store_true
+			help = "Print the whole FITS header."
         "--keyword", "-k"
 			nargs = 1
 			action = :append_arg
 			arg_type = String
-            help = "keyword"
+            help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword"
         "--filter", "-f"
             help = "filter"
 			arg_type = String
 			nargs = 2
-		"--header", "-d"
-			help = "header"
-			action = :store_true
+			metavar = ["KEYWORD", "VALUE"]
+			help = "Print all files where the FITS header KEYWORD = VALUE."
 		"--recursive", "-r"
-			help = "recursive"
+			help = "Recursively explore entire directories."
 			action = :store_true
-		"filename"
+		"FILENAMES"
 			nargs = '*'
 			arg_type = String
-            help = "filenames of "
+            help = "List of all FILENAMES to explore. In conjunction with -r FILENAMES can contain directories."
+			default = ["."]
     end
 
-    parsed_args = parse_args(args, s)
+    parsed_args = parse_args(args, settings)
 
+	args =parsed_args["FILENAMES"];
 
-	args::Vector{String} = isempty(parsed_args["filename"]) ?  ["."] : parsed_args["filename"]
-	# println(args)
 	files = Vector{String}()
 	for arg in args
 		if isdir(arg) && parsed_args["recursive"]
@@ -185,34 +190,5 @@ function main(args)
 	end
 
 end
-
-
-function main2(args::Vector{String})
-
-    s = ArgParseSettings("Example 2 for argparse.jl: " *  # description
-                         "flags, options help, " *
-                         "required arguments.")
-
-    @add_arg_table! s begin
-        "--keyword", "-k"
-			nargs = 1
-			action = :append_arg
-			arg_type = String
-            help = "keyword"
-        "--filter", "-f"
-            help = "filter"
-			arg_type = String
-			nargs = 2
-		"arg1"
-			nargs = '*'
-			arg_type = String
-            help = "an argument"
-    end
-
-    parsed_arg:: Dict{String, Union{String, Vector{String}}} = parse_args(args, s)
-    println("Parsed args:")
-	@show parsed_arg
-end
-
 
 end
