@@ -6,12 +6,9 @@ Package `FITSexplore`
 
 module FITSexplore
 
-export endswith
-
-
 using FITSIO, EasyFITS,ArgParse
 
-const suffixes = [".fits", ".fits.gz","fits.Z"]
+const suffixes = [".fits", ".fits.gz","fits.Z",".oifits"]
 
 
 
@@ -114,7 +111,7 @@ function parse_filter(args::Vector{String}, filter::Vector{String} )
 				header  = read(FitsHeader, filename)
 				if haskey(header,filter[1])
 					if header[filter[1]] ==  filter[2]
-						println(filename ,"\t \t",header[filter[1]])
+						println(filename)
 					end
 				end
 			end
@@ -141,6 +138,9 @@ function main(args)
 		"--header", "-d"
 			help = "header"
 			action = :store_true
+		"--recursive", "-r"
+			help = "recursive"
+			action = :store_true
 		"filename"
 			nargs = '*'
 			arg_type = String
@@ -148,24 +148,30 @@ function main(args)
     end
 
     parsed_args = parse_args(args, s)
-    #  println("Parsed args:")
-    #  for (key,val) in parsed_args
-    #      println("  $key  =>  $(repr(val))")
-    #  end
 
-	args::Vector{String} = isempty(parsed_args["filename"]) ?   readdir() : parsed_args["filename"]
+
+	args::Vector{String} = isempty(parsed_args["filename"]) ?  ["."] : parsed_args["filename"]
 	# println(args)
+	files = Vector{String}()
+	for arg in args
+		if isdir(arg) && parsed_args["recursive"]
+			files =  vcat(files,[root*"/"*filename for (root, dirs, filenames) in walkdir(arg) for filename in filenames  ])
+		else
+			files =  vcat(files,arg)
+		end
+	end
+
 
 	head::Bool =  parsed_args["header"];
 
 	if !isempty(parsed_args["keyword"])
-		parse_keywords(args,parsed_args["keyword"])
+		parse_keywords(files,parsed_args["keyword"])
 
 
 	elseif !isempty(parsed_args["filter"])
-		parse_filter(args,parsed_args["filter"])
+		parse_filter(files,parsed_args["filter"])
 	else
-		for filename in args
+		for filename in files
 			if isfile(filename)
 				if endswith(filename,suffixes)
 					if head
