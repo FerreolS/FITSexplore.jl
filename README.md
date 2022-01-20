@@ -1,6 +1,6 @@
-# FITSexplore.jl
+# FITSexplore
 
-Simple command line tool to explore FITS files content.
+Simple command line script to explore FITS files content.
 
 ## Usage
 
@@ -27,7 +27,7 @@ HDUs: Num  Name                  Type
       9    FDDL                  Table
 ```
 
-#### -r,--recursiveargument
+#### -r,--recursive
 
 Recursively explores entire directories given by TARGET. If no TARGET is given it will explore the working directory.
 
@@ -83,3 +83,16 @@ me@host:~$ FITSexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 ```
 
 ## Installation
+
+* Install the unregistered Julia package FITSexplore.jl.
+
+```julia
+pkg> add https://github.com/FerreolS/FITSexplore.jl
+```
+
+* Copy the script `FITSexplore` located in the bin folder to your favorite `bin` folder included in your `PATH` (e.g `$HOME/bin`, `/usr/local/bin`, `~/Applications`). This script can be found in the folder `.julia/packages/FITSexplore`.
+* Make the script executable.
+
+```julia
+chmod +x FITSexplore
+```
