@@ -1,34 +1,38 @@
 # FITSexplore.jl
+
 Simple command line tool to explore FITS files content.
 
 ## Usage
 
 ```FITSexplore [-d] [-k KEYWORD] [-f KEYWORD VALUE] [-r] [--version] [-h] [TARGET...]```
 
-#### Without optional argument:
+#### Without optional argument
+
 it will display the name and the type of all HDU
 contained in the files TARGET.
 
 ```console
-me@host:~$ FITSexplore GRAVI.fits.Z 
+me@host:~$ FITSexplore GRAVI.fits.Z
 FITS(filename) = File: GRAVI.fits.Z
 Mode: "r" (read-only)
-HDUs: Num  Name                  Type   
-      1                          Image  
-      2    ARRAY_DESCRIPTION     Table  
-      3    ARRAY_GEOMETRY        Table  
-      4    OPTICAL_TRAIN         Table  
-      5    IMAGING_DATA_ACQ      Image  
-      6    IMAGING_DATA_SC       Image  
-      7    IMAGING_DETECTOR_SC   Table  
-      8    OPDC                  Table  
-      9    FDDL                  Table  
+HDUs: Num  Name                  Type
+      1                          Image
+      2    ARRAY_DESCRIPTION     Table
+      3    ARRAY_GEOMETRY        Table
+      4    OPTICAL_TRAIN         Table
+      5    IMAGING_DATA_ACQ      Image
+      6    IMAGING_DATA_SC       Image
+      7    IMAGING_DETECTOR_SC   Table
+      8    OPDC                  Table
+      9    FDDL                  Table
 ```
 
-#### -r,--recursiveargument 
+#### -r,--recursiveargument
+
 Recursively explores entire directories given by TARGET. If no TARGET is given it will explore the working directory.
 
-#### -d, --header 
+#### -d, --header
+
 Display the FITS header of the TARGET
 
 ```console
@@ -50,7 +54,8 @@ CUNIT2  = 'deg     '           / Physical units for CDELT2 and CRVAL2
 HDUNAME = 'IMAGE-OI FINAL IMAGE' / Unique name for the image within the FITS file
 ```
 
-####  -k, --keyword `KEYWORD`
+#### -k, --keyword `KEYWORD`
+
 Print the value of the FITS header `KEYWORD`.
 This argument can be set multiple times to display several FITS keywords.
 
@@ -67,11 +72,14 @@ me@host:~$ FITSexplore -k "ESO DPR TYPE" -k "ESO DET2 SEQ1 DIT" -k  "ESO DET2 ND
 ```
 
 #### -f, --filter `KEYWORD` `VALUE`
+
 Print all files where the FITS header `KEYWORD` = `VALUE`.
 
 ```console
 me@host:~$ FITSexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
-/path/to/folder/file6.fits.Z            
-/path/to/folder/file7.fits.Z            
+/path/to/folder/file6.fits.Z
+/path/to/folder/file7.fits.Z
 /path/to/folder/file8.fits.Z
 ```
+
+## Installation
