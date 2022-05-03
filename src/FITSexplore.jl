@@ -3,8 +3,9 @@
 Package `FITSexplore`
 
 """
-
 module FITSexplore
+
+export fitsexplore
 
 using FITSIO, EasyFITS, ArgParse
 
@@ -68,10 +69,10 @@ function filtercat(filelist::Dict{String, FitsHeader},
 end
 
 
-function explore(dir::String)
+function fitsexplore(dir::String)
 	filedict = Dict{String, FitsHeader}()
 
-	for filename in readdir(dir)
+	for filename in readdir(dir,join=true)
 		if isfile(filename)
 			if endswith(filename,suffixes)
 				get!(filedict, filename) do
@@ -96,13 +97,13 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String} )
 				iskeyword = true
 				for key in keywords
 					if haskey(header,key)
-						str = str * " \t " * string(header[key])
+						str = str * "\t" * string(header[key])
 					else
 						iskeyword = false
 					end
 				end
 				if iskeyword
-					println(filename ," \t ", str)
+					println(filename ,"\t", str)
 				end
 			end
 		end
@@ -115,13 +116,32 @@ function parse_filter(args::Vector{String}, filter::Vector{String} )
 			if endswith(filename,suffixes)
 				header  = read(FitsHeader, filename)
 				if haskey(header,filter[1])
-					if header[filter[1]] ==  filter[2]
+					if comparekeys(header[filter[1]],filter[2])
 						println(filename)
 					end
 				end
 			end
 		end
 	end
+end
+
+function comparekeys(key1::AbstractString,key2::AbstractString)
+	return key1==key2
+end
+
+function comparekeys(key1::Bool,key2::AbstractString)
+	p = false
+	if (lowercase(key2)=="true") | (lowercase(key2)=="t")| (key2=="1")
+		p = true
+	elseif (lowercase(key2)=="false") | (lowercase(key2)=="f")| (key2=="0")
+		p = false
+	else
+		return false
+	end
+	return key1==p
+end
+function comparekeys(key1::Number,key2::AbstractString)
+	return key1==Meta.parse(key2)
 end
 
 function main(args)
