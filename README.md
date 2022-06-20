@@ -97,6 +97,12 @@ me@host:~$ ls -lh $(FITSexplore -f "ESO DPR TYPE" "DARK" -r /path/to/folder)
 ````
 
 ## Installation
+* As FITSexplore use  [EasyFITS.jl](https://github.com/emmt/EasyFITS.jl), the `EmmtRegistry` must be added to your Julia package manager:
+* 
+```julia
+using Pkg
+pkg"registry add https://github.com/emmt/EmmtRegistry"
+```
 
 * Install the unregistered Julia package FITSexplore.jl.
 
