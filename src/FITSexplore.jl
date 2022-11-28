@@ -145,8 +145,8 @@ function comparekeys(key1::Number,key2::AbstractString)
 end
 
 
-function stats(a)
-        println("size \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
+function print_stats(a)
+        println("size \t \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
 	    println(size(a), "\t", eltype(a),"\t",round.(minimum(a); digits=4),"\t",
                   round.(maximum(a); digits=4),"\t",round.(mean(a); digits=4),"\t",
                   round.(std(a); digits=4),"\t",round.(median(a); digits=4),"\t",
@@ -169,9 +169,7 @@ function main(args)
 			action = :store_true
 			help = "Print the whole FITS header."
         "--stats", "-s"
-			nargs = 1
-			action = :append_arg
-			arg_type = String
+			action = :store_true
             help = "Print the Statistics of the first HDU"
         "--keyword", "-k"
 			nargs = 1
@@ -222,7 +220,13 @@ function main(args)
 					if head
 						@show read(FitsHeader,filename)
 					elseif stats
-						stats(read(FITS(filename)[1]))
+						f= FITS(filename)
+						hdu=1
+						while isempty(size(f[hdu]))
+							hdu=hdu+1
+						end
+						println("HDU :", hdu)
+						print_stats(read(f[hdu]))
 					else
 						@show FITS(filename)
 					end
