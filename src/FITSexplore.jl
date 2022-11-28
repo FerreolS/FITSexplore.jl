@@ -7,7 +7,7 @@ module FITSexplore
 
 export fitsexplore
 
-using FITSIO, EasyFITS, ArgParse
+using FITSIO, EasyFITS, ArgParse, StatsBase
 
 const suffixes = [".fits", ".fits.gz","fits.Z",".oifits",".oifits.gz",".oifits.Z"]
 
@@ -144,11 +144,21 @@ function comparekeys(key1::Number,key2::AbstractString)
 	return key1==Meta.parse(key2)
 end
 
+
+function stats(a)
+        println("size \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
+	    println(size(a), "\t", eltype(a),"\t",round.(minimum(a); digits=4),"\t",
+                  round.(maximum(a); digits=4),"\t",round.(mean(a); digits=4),"\t",
+                  round.(std(a); digits=4),"\t",round.(median(a); digits=4),"\t",
+                  round.(mad(a); digits=4))
+end
+
+
 function main(args)
 
     settings = ArgParseSettings(prog = "FITSexplore",
 						 #version = @project_version,
-						 version = "0.1",
+						 version = "0.2",
 						 add_version = true)
 
 	settings.description =  "Simple tool to explore the content of FITS files.\n\n"*
@@ -158,6 +168,11 @@ function main(args)
 			help = "header"
 			action = :store_true
 			help = "Print the whole FITS header."
+        "--stats", "-s"
+			nargs = 1
+			action = :append_arg
+			arg_type = String
+            help = "Print the Statistics of the first HDU"
         "--keyword", "-k"
 			nargs = 1
 			action = :append_arg
@@ -194,11 +209,10 @@ function main(args)
 
 
 	head::Bool =  parsed_args["header"];
+	stats::Bool =  parsed_args["stats"];
 
 	if !isempty(parsed_args["keyword"])
 		parse_keywords(files,parsed_args["keyword"])
-
-
 	elseif !isempty(parsed_args["filter"])
 		parse_filter(files,parsed_args["filter"])
 	else
@@ -207,6 +221,8 @@ function main(args)
 				if endswith(filename,suffixes)
 					if head
 						@show read(FitsHeader,filename)
+					elseif stats
+						stats(read(FITS(filename)[1]))
 					else
 						@show FITS(filename)
 					end
