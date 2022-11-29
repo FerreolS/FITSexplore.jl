@@ -225,7 +225,7 @@ function main(args)
 						while isempty(size(f[hdu]))
 							hdu=hdu+1
 						end
-						println("HDU :", hdu)
+						println(filename, "  hdu :", hdu)
 						print_stats(read(f[hdu]))
 					else
 						@show FITS(filename)

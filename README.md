@@ -53,6 +53,16 @@ CUNIT1  = 'deg     '           / Physical units for CDELT1 and CRVAL1
 CUNIT2  = 'deg     '           / Physical units for CDELT2 and CRVAL2
 HDUNAME = 'IMAGE-OI FINAL IMAGE' / Unique name for the image within the FITS file
 ```
+#### -s, --stats
+
+Display some statistical properties of the first hdu of the  `TARGET`
+
+```console
+me@host:~$ FITSexplore -s file.fits
+size 	 	 type 		minimum	maximum	mean	std	median	mad
+(1156, 1024, 20)	UInt16	966.0	31844.0	11440.0019	10963.8464	1984.0	1472.224
+```
+
 
 #### -k, --keyword `KEYWORD`
 
