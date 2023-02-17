@@ -116,13 +116,13 @@ pkg"registry add https://github.com/emmt/EmmtRegistry"
 
 * Install the unregistered Julia package FITSexplore.jl.
 
-```julia
+```julia-pkg
 pkg> add https://github.com/FerreolS/FITSexplore.jl
 ```
 
 * Copy the script `FITSexplore` located in the bin folder to your favorite `bin` folder included in your `PATH` (e.g `$HOME/bin`, `/usr/local/bin`, `~/Applications`). This script can be found in the folder `.julia/packages/FITSexplore`.
 * Make the script executable.
 
-```julia
+```bash
 chmod +x FITSexplore
 ```

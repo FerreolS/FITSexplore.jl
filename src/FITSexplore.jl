@@ -7,7 +7,7 @@ module FITSexplore
 
 export fitsexplore
 
-using FITSIO, EasyFITS, ArgParse, StatsBase
+using FITSIO, ArgParse, StatsBase
 
 const suffixes = [".fits", ".fits.gz","fits.Z",".oifits",".oifits.gz",".oifits.Z"]
 
@@ -48,35 +48,35 @@ end
 
 Build a `newlist` dictionnary of all files where `fitsheader[keyword] == value`.
 """
-function filtercat(filelist::Dict{String, FitsHeader},
+function filtercat(filelist::Dict{String, FITSHeader},
 					keyword::String,
 					values::Union{Vector{String}, Vector{Bool}, Vector{Integer}, Vector{AbstractFloat}})
-	newlist = Dict{String, FitsHeader}()
+	newlist = Dict{String, FITSHeader}()
 	for value in values
 		merge!(newlist, filtercat(filelist,keyword,value))
 	end
 	return newlist
 end
 
-function filtercat(filelist::Dict{String, FitsHeader},
+function filtercat(filelist::Dict{String, FITSHeader},
 					keyword::String,
 					value::Union{String, Bool, Integer, AbstractFloat, Nothing})
 	try tmp = filter(p->p.second[keyword] == value,filelist)
 		return  tmp
 	catch
-		return Dict{String, FitsHeader}()
+		return Dict{String, FITSHeader}()
 	end
 end
 
 
 function fitsexplore(dir::String)
-	filedict = Dict{String, FitsHeader}()
+	filedict = Dict{String, FITSHeader}()
 
 	for filename in readdir(dir,join=true)
 		if isfile(filename)
 			if endswith(filename,suffixes)
 				get!(filedict, filename) do
-					read(FitsHeader, filename)
+					read_header(filename)
 				end
 			end
 		end
@@ -92,7 +92,7 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String} )
 	for filename in args
 		if isfile(filename)
 			if endswith(filename,suffixes)
-				header  = read(FitsHeader, filename)
+				header  = read_header(filename)
 				str = ""
 				iskeyword = true
 				for key in keywords
@@ -114,7 +114,7 @@ function parse_filter(args::Vector{String}, filter::Vector{String} )
 	for filename in args
 		if isfile(filename)
 			if endswith(filename,suffixes)
-				header  = read(FitsHeader, filename)
+				header  = read_header(filename)
 				if haskey(header,filter[1])
 					if comparekeys(header[filter[1]],filter[2])
 						println(filename)
@@ -218,7 +218,7 @@ function main(args)
 			if isfile(filename)
 				if endswith(filename,suffixes)
 					if head
-						@show read(FitsHeader,filename)
+						@show read(FITSHeader,filename)
 					elseif stats
 						f= FITS(filename)
 						hdu=1
