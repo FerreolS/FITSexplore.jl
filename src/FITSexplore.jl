@@ -218,7 +218,7 @@ function main(args)
 			if isfile(filename)
 				if endswith(filename,suffixes)
 					if head
-						@show read(FITSHeader,filename)
+						@show read_header(filename)
 					elseif stats
 						f= FITS(filename)
 						hdu=1
