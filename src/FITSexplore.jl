@@ -13,6 +13,16 @@ const suffixes = [".fits", ".fits.gz","fits.Z",".oifits",".oifits.gz",".oifits.Z
 
 
 
+function julia_main()::Cint
+    try
+        main(ARGS)
+    catch
+        Base.invokelatest(Base.display_error, Base.catch_stack())
+        return 1
+    end
+    return 0
+end
+
 """
 	endswith(chain::Union{String,Vector{String}}, pattern::Vector{String})
 
@@ -146,11 +156,33 @@ end
 
 
 function print_stats(a)
-        println("size \t \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
-	    println(size(a), "\t", eltype(a),"\t",round.(minimum(a); digits=4),"\t",
-                  round.(maximum(a); digits=4),"\t",round.(mean(a); digits=4),"\t",
-                  round.(std(a); digits=4),"\t",round.(median(a); digits=4),"\t",
-                  round.(mad(a); digits=4))
+        # println("size \t \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
+	    # println(size(a), "\t", eltype(a),"\t",round.(minimum(a); digits=4),"\t",
+        #           round.(maximum(a); digits=4),"\t",round.(mean(a); digits=4),"\t",
+        #           round.(std(a); digits=4),"\t",round.(median(a); digits=4),"\t",
+        #           round.(mad(a); digits=4))
+
+		
+        println("size \t type \t\t mean\tstd\tmedian\tmad")
+        med= median(a)
+        madd= mad(a,center=med)
+        minn =round.(minimum(a); digits=4) 
+        maxx =round.(maximum(a); digits=4) 
+	    println(size(a),"\t",eltype(a),"\t \t",
+                  round.(mean(a); digits=4)," \t",
+                  round.(std(a); digits=4),"\t",round.(med; digits=4),"\t",
+                  round.(madd; digits=4))
+
+        h = fit(Histogram,a[:], range(max(minn,med-5*madd),min(maxx,med+5*madd),50)) 
+        W = h.weights
+        barsyms = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
+        symidxs = eachindex(barsyms)
+        norm_factor = length(symidxs) / maximum(W)
+        get_sym_idx(x) = isnan(x) ? 1 : clamp(first(symidxs) + floor(Int, norm_factor * x), first(symidxs), last(symidxs))
+		print(minn)
+		print(String(barsyms[get_sym_idx.(W)]))
+		print(maxx)
+
 end
 
 
