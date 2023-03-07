@@ -173,7 +173,7 @@ function print_stats(a)
                   round.(std(a); digits=4),"\t",round.(med; digits=4),"\t",
                   round.(madd; digits=4))
 
-        h = fit(Histogram,a[:], range(max(minn,med-5*madd),min(maxx,med+5*madd),50)) 
+        h = fit(Histogram,a[:], range(max(minn,med-3*madd),min(maxx,med+3*madd),50)) 
         W = h.weights
         barsyms = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
         symidxs = eachindex(barsyms)
@@ -184,6 +184,8 @@ function print_stats(a)
 		print(maxx)
 
 end
+name(hdu::HDU) = FITSIO.fits_try_read_extname(hdu.fitsfile)
+
 
 
 function main(args)
@@ -253,12 +255,17 @@ function main(args)
 						@show read_header(filename)
 					elseif stats
 						f= FITS(filename)
-						hdu=1
-						while isempty(size(f[hdu]))
-							hdu=hdu+1
+						for hdu ∈ f
+							if isa(hdu, ImageHDU) 
+								if (size(hdu) == ())
+									continue
+								else
+									println(filename, "  hdu :", name(hdu))
+									print_stats(read(hdu))
+									println()
+								end
+							end
 						end
-						println(filename, "  hdu :", hdu)
-						print_stats(read(f[hdu]))
 					else
 						@show FITS(filename)
 					end
