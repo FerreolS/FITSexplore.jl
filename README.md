@@ -92,6 +92,19 @@ me@host:~$ FITSexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 /path/to/folder/file8.fits.Z
 ```
 
+#### -s, --stats
+
+Display statistical information about all image HDU: 
+
+```console
+FITSexplore -s file.fits
+jw01373007001_03102_00001_nrcblong_cal.fits  hdu :SCI
+size     type            mean   std     median  mad
+(640, 640)      Float32         16170.782       10711.193       17808.355       10895.537
+-35147.19           █      ▁▁▁▁▂▁▁▂▂▂▂▂▁▁▁▁               52474.26
+ 
+ ``` 
+
 ### Other examples
 
 * Adding a keyword value in the filename:
@@ -105,6 +118,7 @@ me@host:~$ FITSexplore -k "ESO DPR TYPE" | awk  '{system("mv "$1" "$2"_"$1)}'
 ```console
 me@host:~$ ls -lh $(FITSexplore -f "ESO DPR TYPE" "DARK" -r /path/to/folder)
 ````
+
 
 ## Installation
 
