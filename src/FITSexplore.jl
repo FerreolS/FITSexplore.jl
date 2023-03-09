@@ -188,6 +188,7 @@ function print_stats(a)
 	end
 	return  (max(minn,med-3*madd),min(maxx,med+3*madd))
 end
+
 name(hdu::HDU) = FITSIO.fits_try_read_extname(hdu.fitsfile)
 
 
@@ -202,94 +203,134 @@ function main(args)
 	settings.description =  "Simple tool to explore the content of FITS files.\n\n"*
 	"Without any argument, it will display the name and the type of all HDU contained in the files TARGET."
 	@add_arg_table! settings begin
-	"--header", "-d"
-	help = "header"
-	action = :store_true
-	help = "Print the whole FITS header."
-	"--stats", "-s"
-	action = :store_true
-	help = "Print the statistics of all image HDU"
-	"--plot", "-p"
-	action = :store_true
-	help = "show the statistic and plot all  HDU"
-	"--keyword", "-k"
-	nargs = 1
-	action = :append_arg
-	arg_type = String
-	help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword"
-	"--filter", "-f"
-	help = "filter"
-	arg_type = String
-	nargs = 2
-	metavar = ["KEYWORD", "VALUE"]
-	help = "Print all files where the FITS header KEYWORD = VALUE."
-	"--recursive", "-r"
-	help = "Recursively explore entire directories."
-	action = :store_true
-	"TARGET"
-	nargs = '*'
-	arg_type = String
-	help = "List of all TARGET to explore. In conjunction with -r TARGET can contain directories."
-	default = ["."]
-end
-
-parsed_args = parse_args(args, settings)
-
-args =parsed_args["TARGET"];
-
-files = Vector{String}()
-for arg in args
-	if isdir(arg) && parsed_args["recursive"]
-		files =  vcat(files,[root*"/"*filename for (root, dirs, TARGET) in walkdir(arg) for filename in TARGET  ])
-	else
-		files =  vcat(files,arg)
+		"--header", "-d"
+		help = "header"
+		action = :store_true
+		help = "Print the whole FITS header."
+		"--stats", "-s"
+		action = :store_true
+		help = "Print the statistics of all image HDU"
+		"--plot", "-p"
+		action = :store_true
+		help = "show the statistic and plot all  HDU"
+		"--hdu", "-u"
+		nargs = 1
+		action = :append_arg
+		arg_type = Int
+		help = "Select the hdu by number in conjunction with -p, -s, -d"
+		"--keyword", "-k"
+		nargs = 1
+		action = :append_arg
+		arg_type = String
+		help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword"
+		"--filter", "-f"
+		help = "filter"
+		arg_type = String
+		nargs = 2
+		metavar = ["KEYWORD", "VALUE"]
+		help = "Print all files where the FITS header KEYWORD = VALUE."
+		"--recursive", "-r"
+		help = "Recursively explore entire directories."
+		action = :store_true
+		"TARGET"
+		nargs = '*'
+		arg_type = String
+		help = "List of all TARGET to explore. In conjunction with -r TARGET can contain directories."
+		default = ["."]
 	end
-end
+
+	parsed_args = parse_args(args, settings)
+
+	args =parsed_args["TARGET"];
+
+	files = Vector{String}()
+	for arg in args
+		if isdir(arg) && parsed_args["recursive"]
+			files =  vcat(files,[root*"/"*filename for (root, dirs, TARGET) in walkdir(arg) for filename in TARGET  ])
+		else
+			files =  vcat(files,arg)
+		end
+	end
 
 
-head::Bool =  parsed_args["header"];
-stats::Bool =  parsed_args["stats"];
-plott::Bool =  parsed_args["plot"];
+	head::Bool =  parsed_args["header"];
+	stats::Bool =  parsed_args["stats"];
+	plott::Bool =  parsed_args["plot"];
 
-if !isempty(parsed_args["keyword"])
-	parse_keywords(files,parsed_args["keyword"])
-elseif !isempty(parsed_args["filter"])
-	parse_filter(files,parsed_args["filter"])
-else
-	for filename in files
-		if isfile(filename)
-			if endswith(filename,suffixes)
-				if head
-					@show read_header(filename)
-				elseif (stats || plott)
-					f= FITS(filename)
-					for hdu ∈ f
-						if isa(hdu, ImageHDU) 
-							if (size(hdu) == ())
-								continue
-							else
-								println(filename, "  hdu :", name(hdu))
-								data =read(hdu) 
-								(minn, maxx) = print_stats(read(hdu))
-								println()
-								if plott
-									if ndims(data) ==3
-										display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)))
+	if !isempty(parsed_args["keyword"])
+		parse_keywords(files,parsed_args["keyword"])
+	elseif !isempty(parsed_args["filter"])
+		parse_filter(files,parsed_args["filter"])
+	else
+		for filename in files
+			if isfile(filename)
+				if endswith(filename,suffixes)
+					if head
+						if !isempty(parsed_args["hdu"])
+							for index ∈ reduce(vcat,parsed_args["hdu"])
+								@show read_header(filename, hduindex =index)
+							end
+						else
+							@show read_header(filename)
+						end
+					elseif (stats || plott)
+						f= FITS(filename)
+
+						if !isempty(parsed_args["hdu"])
+							
+							for index ∈ reduce(vcat,parsed_args["hdu"])
+								hdu = f[index]
+								if isa(hdu, ImageHDU) 
+									if (size(hdu) == ())
+										continue
 									else
-										display(heatmap(clamp.(data,minn,maxx)))
+										println(filename, "  hdu :", name(hdu))
+										data =read(hdu) 
+										(minn, maxx) = print_stats(read(hdu))
+										println()
+										if plott
+											if ndims(data) ==3
+												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)))
+											else
+												display(heatmap(clamp.(data,minn,maxx)))
+											end
+											
+										end
 									end
-									
+								end
+							end
+						else
+							for hdu ∈ f
+								if isa(hdu, ImageHDU) 
+									if (size(hdu) == ())
+										continue
+									else
+										println(filename, "  hdu :", name(hdu))
+										data =read(hdu) 
+										(minn, maxx) = print_stats(read(hdu))
+										println()
+										if plott
+											if ndims(data) ==3
+												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)))
+											else
+												display(heatmap(clamp.(data,minn,maxx)))
+											end
+											
+										end
+									end
 								end
 							end
 						end
+					elseif !isempty(parsed_args["hdu"])
+						@show read_header(filename[parsed_args["hdu"]])
+					else
+						@show FITS(filename)
 					end
-				else
-					@show FITS(filename)
+
 				end
 			end
 		end
 	end
-end
 
 end
 
