@@ -290,9 +290,9 @@ function main(args)
 										println()
 										if plott
 											if ndims(data) ==3
-												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)))
+												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)'))
 											else
-												display(heatmap(clamp.(data,minn,maxx)))
+												display(heatmap(clamp.(data,minn,maxx)'))
 											end
 											
 										end
@@ -311,9 +311,9 @@ function main(args)
 										println()
 										if plott
 											if ndims(data) ==3
-												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)))
+												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)'))
 											else
-												display(heatmap(clamp.(data,minn,maxx)))
+												display(heatmap(clamp.(data,minn,maxx)'))
 											end
 											
 										end
