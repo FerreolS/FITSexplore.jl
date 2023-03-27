@@ -103,17 +103,21 @@ function parse_keywords(
 				header  = read_header(filename)
 				str = ""
 				iskeyword = true
+				isfirst = true
 				for key in keywords
 					if haskey(header,key)
-						str = str * "\t" * string(header[key])
+						isfirst || (str *= "\t")
+						str *= string(header[key])
 					else
 						iskeyword = false
 					end
+					isfirst = false
 				end
 				if iskeyword
 					for key in keywordsoptional
-						value = haskey(header,key) ? string(header[key]) : " "
-						str *= "\t" * value
+						isfirst || (str *= "\t")
+						str *= haskey(header,key) ? string(header[key]) : " "
+						isfirst = false
 					end
 					println(filename ,"\t", str)
 				end
