@@ -94,11 +94,9 @@ function fitsexplore(dir::String)
 	return filedict
 end
 
-function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}} )
-	parse_keywords(args,[k[1] for k in keywords])
-end
-
-function parse_keywords(args::Vector{String}, keywords::Vector{String} )
+function parse_keywords(
+	args::Vector{String}, keywords::Vector{String}, keywordsoptional::Vector{String}
+)
 	for filename in args
 		if isfile(filename)
 			if endswith(filename,suffixes)
@@ -113,11 +111,33 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String} )
 					end
 				end
 				if iskeyword
+					for key in keywordsoptional
+						value = haskey(header,key) ? string(header[key]) : " "
+						str *= "\t" * value
+					end
 					println(filename ,"\t", str)
 				end
 			end
 		end
 	end
+end
+
+function parse_keywords(
+	args::Vector{String}, keywords::Vector{Vector{String}}, keywordsoptional::Vector{Vector{String}}
+)
+	parse_keywords(args, first.(keywords), first.(keywordsoptional))
+end
+
+function parse_keywords(
+	args::Vector{String}, keywords::Vector{String}, keywordsoptional::Vector{Vector{String}}
+)
+	parse_keywords(args, keywords, first.(keywordsoptional))
+end
+
+function parse_keywords(
+	args::Vector{String}, keywords::Vector{Vector{String}}, keywordsoptional::Vector{String}
+)
+	parse_keywords(args, first.(keywords), keywordsoptional)
 end
 
 function parse_filter(args::Vector{String}, filter::Vector{String} )
@@ -222,7 +242,12 @@ function main(args)
 		nargs = 1
 		action = :append_arg
 		arg_type = String
-		help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword"
+		help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword. A file with missing KEYWORD is not displayed."
+		"--keyword-optional", "-K"
+		nargs = 1
+		action = :append_arg
+		arg_type = String
+		help = "Similar to --keyword but if the KEYWORD is missing in the header, a string containing one space is used. Thus, an optional KEYWORD is always found. Optional keywords are always printed after required keywords."
 		"--filter", "-f"
 		help = "filter"
 		arg_type = String
@@ -257,8 +282,8 @@ function main(args)
 	stats::Bool =  parsed_args["stats"];
 	plott::Bool =  parsed_args["plot"];
 
-	if !isempty(parsed_args["keyword"])
-		parse_keywords(files,parsed_args["keyword"])
+	if !isempty(parsed_args["keyword"]) || !isempty(parsed_args["keyword-optional"])
+		parse_keywords(files,parsed_args["keyword"],parsed_args["keyword-optional"])
 	elseif !isempty(parsed_args["filter"])
 		parse_filter(files,parsed_args["filter"])
 	else
