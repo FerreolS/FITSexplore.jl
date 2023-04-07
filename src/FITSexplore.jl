@@ -163,15 +163,15 @@ function print_stats(a)
 	#           round.(mad(a); digits=4))
 	
 	
-	println("size \t type \t\t mean\tstd\tmedian\tmad")
 	med= median(a)
 	madd= mad(a,center=med)
 	minn =round.(minimum(a); digits=4) 
 	maxx =round.(maximum(a); digits=4) 
-	println(size(a),"\t",eltype(a),"\t \t",
-	round.(mean(a); digits=4)," \t",
-	round.(std(a); digits=4),"\t",round.(med; digits=4),"\t",
-	round.(madd; digits=4))
+	println(
+		"size ", size(a), "  eltype ", eltype(a),
+		"  mean ", round.(mean(a); digits=4), "  std ", round.(std(a); digits=4),
+		"  median ", round.(med; digits=4), "  mad ", round.(madd; digits=4)
+	)
 	try 
 		h = fit(Histogram,a[:], range(max(minn,med-3*madd),min(maxx,med+3*madd),50)) 
 		W = h.weights
@@ -290,9 +290,9 @@ function main(args)
 										println()
 										if plott
 											if ndims(data) ==3
-												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)))
+												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)'))
 											else
-												display(heatmap(clamp.(data,minn,maxx)))
+												display(heatmap(clamp.(data,minn,maxx)'))
 											end
 											
 										end
@@ -311,9 +311,9 @@ function main(args)
 										println()
 										if plott
 											if ndims(data) ==3
-												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)))
+												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)'))
 											else
-												display(heatmap(clamp.(data,minn,maxx)))
+												display(heatmap(clamp.(data,minn,maxx)'))
 											end
 											
 										end
