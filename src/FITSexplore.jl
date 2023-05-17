@@ -316,8 +316,7 @@ function main(args)
 					if head
 						if !isempty(parsed_args["hdu"])
 							for index ∈ reduce(vcat,parsed_args["hdu"])
-								@show read_header(filename[index])
-								#@show read_header(filename, hduindex =index)
+								@show read_header(filename,index)
 							end
 						else
 							@show read_header(filename)
