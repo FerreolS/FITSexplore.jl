@@ -60,7 +60,7 @@ Build a `newlist` dictionnary of all files where `fitsheader[keyword] == value`.
 """
 function filtercat(filelist::Dict{String, FITSHeader},
 	keyword::String,
-	values::Union{Vector{String}, Vector{Bool}, Vector{Integer}, Vector{AbstractFloat}})
+	values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}})
 	newlist = Dict{String, FITSHeader}()
 	for value in values
 		merge!(newlist, filtercat(filelist,keyword,value))
@@ -78,21 +78,37 @@ function filtercat(filelist::Dict{String, FITSHeader},
 	end
 end
 
+function filtercat2(filelist::Dict{String, FITSHeader},
+                    keyword::String,
+                    values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}})
+    newlist = Dict{String, FITSHeader}()
+    for (filename, header) in filelist
+        for value in values
+            if haskey(header, keyword) && header[keyword] == value
+                newlist[filename] = header
+                break
+            end
+        end
+    end
+    return newlist
+end
+
+function filtercat3(filelist::Dict{String, FITSHeader}, keyword::String, values::AbstractVector)
+    filtered = filter(file -> haskey(file[2], keyword) && file[2][keyword] in values, filelist)
+    return Dict(filtered)
+end
+
 
 function fitsexplore(dir::String)
-	filedict = Dict{String, FITSHeader}()
-	
-	for filename in readdir(dir,join=true)
-		if isfile(filename)
-			if endswith(filename,suffixes)
-				get!(filedict, filename) do
-					read_header(filename)
-				end
-			end
-		end
-	end
-	return filedict
+    filedict = Dict{String, FITSHeader}()
+    for filename in readdir(dir, join=true)
+        if isfile(filename) && endswith(filename, suffixes)
+            filedict[filename] = read_header(filename)
+        end
+    end
+    return filedict
 end
+
 
 function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}} )
 	parse_keywords(args,[k[1] for k in keywords])
@@ -120,38 +136,70 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String} )
 	end
 end
 
+function parse_keywords(args::Vector{String}, keywords::Set{String})
+    for filename in args
+        if isfile(filename) && endswith(filename, suffixes)
+            header = read_header(filename)
+            if all(keyword in keys(header) for keyword in keywords)
+                str = join([header[key] for key in keywords], "\t")
+              	println(filename, "\t", str)
+            end
+        end
+    end
+end
+
 function parse_filter(args::Vector{String}, filter::Vector{String} )
 	for filename in args
-		if isfile(filename)
-			if endswith(filename,suffixes)
-				header  = read_header(filename)
-				if haskey(header,filter[1])
-					if comparekeys(header[filter[1]],filter[2])
-						println(filename)
-					end
+		if isfile(filename) && endswith(filename,suffixes)
+			header  = read_header(filename)
+			if haskey(header,filter[1])
+				if comparekeys(header[filter[1]],filter[2])
+					println(filename)
 				end
 			end
+			
 		end
 	end
 end
+"""
+filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
 
-function comparekeys(key1::AbstractString,key2::AbstractString)
-	return key1==key2
+Filter the files in `filelist` based on the keyword-value pairs in `filter`.
+
+The function modifies `filelist` in place and removes the files that do not meet the filter criteria.
+"""
+function filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
+    for (filename, header) in filelist
+        keep = true
+        for (key, value) in filter
+            if !haskey(header, key) || header[key] != value
+                keep = false
+                break
+            end
+        end
+        if !keep
+            delete!(filelist, filename)
+        end
+    end
 end
 
-function comparekeys(key1::Bool,key2::AbstractString)
-	p = false
-	if (lowercase(key2)=="true") | (lowercase(key2)=="t")| (key2=="1")
-		p = true
-	elseif (lowercase(key2)=="false") | (lowercase(key2)=="f")| (key2=="0")
-		p = false
-	else
-		return false
-	end
-	return key1==p
+function comparekeys(key1::AbstractString, key2::AbstractString)
+    key1 == key2
 end
-function comparekeys(key1::Number,key2::AbstractString)
-	return key1==Meta.parse(key2)
+
+function comparekeys(key1::Bool, key2::AbstractString)
+    if (lowercase(key2) == "true") | (lowercase(key2) == "t") | (key2 == "1")
+        key1
+    elseif (lowercase(key2) == "false") | (lowercase(key2) == "f") | (key2 == "0")
+        !key1
+    else
+        false
+    end
+end
+
+
+function comparekeys(key1::T,key2::AbstractString) where {T <: Number}
+	return key1==parse(T,key2)
 end
 
 
@@ -268,7 +316,8 @@ function main(args)
 					if head
 						if !isempty(parsed_args["hdu"])
 							for index ∈ reduce(vcat,parsed_args["hdu"])
-								@show read_header(filename, hduindex =index)
+								@show read_header(filename[index])
+								#@show read_header(filename, hduindex =index)
 							end
 						else
 							@show read_header(filename)
