@@ -1,4 +1,5 @@
 [deps]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 FITSexplore = "8adab973-ac17-4ec6-8b81-43cd6f4779d2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
