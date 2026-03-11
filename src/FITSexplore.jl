@@ -24,29 +24,13 @@ function julia_main()::Cint
 end
 
 """
-endswith(chain::Union{String,Vector{String}}, pattern::Vector{String})
+has_suffix(chain, patterns)
 
-Overloading of Base.endswith for vectors of string. Return `true` if `chain`
-ends with one of the patterns given in `pattern`
+Return `true` if `chain` ends with at least one suffix in `patterns`.
 """
-function Base.endswith(chain::Union{String,Vector{String}}, pattern::Vector{String})
-	for str in pattern
-		if endswith(chain,str)
-			return true
-		end
-	end
-	return false
-end
-
-"""
-endswith(chain::Vector{String}, pattern::String)
-
-Overloading of Base.endswith for vectors of string. Return `true` if `chain`
-ends with `pattern`
-"""
-function Base.endswith(chains::Vector{String},pattern::AbstractString)
-	for chain in chains
-		if endswith(chain,pattern)
+function has_suffix(chain::AbstractString, patterns::AbstractVector{<:AbstractString})
+	for suffix in patterns
+		if endswith(chain, suffix)
 			return true
 		end
 	end
@@ -102,7 +86,7 @@ end
 function fitsexplore(dir::String)
     filedict = Dict{String, FITSHeader}()
     for filename in readdir(dir, join=true)
-        if isfile(filename) && endswith(filename, suffixes)
+		if isfile(filename) && has_suffix(filename, suffixes)
             filedict[filename] = read_header(filename)
         end
     end
@@ -117,7 +101,7 @@ end
 function parse_keywords(args::Vector{String}, keywords::Vector{String} )
 	for filename in args
 		if isfile(filename)
-			if endswith(filename,suffixes)
+			if has_suffix(filename,suffixes)
 				header  = read_header(filename)
 				str = ""
 				iskeyword = true
@@ -138,7 +122,7 @@ end
 
 function parse_keywords(args::Vector{String}, keywords::Set{String})
     for filename in args
-        if isfile(filename) && endswith(filename, suffixes)
+		if isfile(filename) && has_suffix(filename, suffixes)
             header = read_header(filename)
             if all(keyword in keys(header) for keyword in keywords)
                 str = join([header[key] for key in keywords], "\t")
@@ -150,7 +134,7 @@ end
 
 function parse_filter(args::Vector{String}, filter::Vector{String} )
 	for filename in args
-		if isfile(filename) && endswith(filename,suffixes)
+		if isfile(filename) && has_suffix(filename,suffixes)
 			header  = read_header(filename)
 			if haskey(header,filter[1])
 				if comparekeys(header[filter[1]],filter[2])
@@ -313,7 +297,7 @@ function (@main)(args)
 	else
 		for filename in files
 			if isfile(filename)
-				if endswith(filename,suffixes)
+				if has_suffix(filename,suffixes)
 					if head
 						if !isempty(parsed_args["hdu"])
 							for index ∈ reduce(vcat,parsed_args["hdu"])
