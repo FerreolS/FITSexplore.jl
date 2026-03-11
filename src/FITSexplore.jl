@@ -11,8 +11,6 @@ using FITSIO, ArgParse, StatsBase, UnicodePlots
 
 const suffixes = [".fits", ".fits.gz","fits.Z",".oifits",".oifits.gz",".oifits.Z"]
 
-
-
 function julia_main()::Cint
 	try
 		main(ARGS)
@@ -242,7 +240,7 @@ name(hdu::HDU) = FITSIO.fits_try_read_extname(hdu.fitsfile)
 
 
 
-function main(args)
+function (@main)(args)
 	
 	settings = ArgParseSettings(prog = "FITSexplore",
 	#version = @project_version,

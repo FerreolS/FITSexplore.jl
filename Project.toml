@@ -6,6 +6,9 @@ version = "0.1.0"
 [workspace]
 projects = ["test"]
 
+[apps]
+fitsexplore = {}
+
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
