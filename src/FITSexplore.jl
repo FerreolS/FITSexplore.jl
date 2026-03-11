@@ -9,7 +9,7 @@ module FITSexplore
 
 export fitsexplore
 
-using AstroFITS, FITSHeaders, ArgParse, StatsBase, UnicodePlots
+using AstroFITS, FITSHeaders, ArgParse, PrecompileTools, StatsBase, UnicodePlots
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
 
@@ -503,6 +503,26 @@ function main(args = ARGS)
         end
     end
 
+end
+
+@setup_workload begin
+    keyword_args = ["-k", "NAXIS", "dummy.fits"]
+    keyword_optional_args = ["-k", "NAXIS", "-K", "OBJECT", "dummy.fits"]
+    filter_args = ["-f", "NAXIS", "2", "dummy.fits"]
+    @compile_workload begin
+        try
+            main(keyword_args)
+            main(keyword_optional_args)
+            main(filter_args)
+            parse_keywords(String[], ["NAXIS"], String[])
+            parse_filter(String[], ["NAXIS", "2"])
+            comparekeys(2, "2")
+            comparekeys("A", "A")
+            comparekeys(true, "true")
+        catch
+            # Ignore runtime errors here; the goal is to record compilation edges.
+        end
+    end
 end
 
 # Register main as the app entry point for `julia -m FITSexplore` on Julia >= 1.11.
