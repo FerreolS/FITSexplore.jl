@@ -427,13 +427,13 @@ function main(args = ARGS)
                             for index in reduce(vcat, parsed_args["hdu"])
                                 hdr = try_read_header(filename, index)
                                 if !isnothing(hdr)
-                                    @show hdr
+                                    show(IOContext(stdout, :limit => false), "text/plain", hdr)
                                 end
                             end
                         else
                             hdr = try_read_header(filename)
                             if !isnothing(hdr)
-                                @show hdr
+                                show(IOContext(stdout, :limit => false), "text/plain", hdr)
                             end
                         end
                     elseif (stats || plott)
@@ -489,12 +489,12 @@ function main(args = ARGS)
                         for index in reduce(vcat, parsed_args["hdu"])
                             hdr = try_read_header(filename, index)
                             if !isnothing(hdr)
-                                @show hdr
+                                show(IOContext(stdout, :limit => false), "text/plain", hdr)
                             end
                         end
                     else
                         f = openfits(filename)
-                        @show f
+                        show(IOContext(stdout, :limit => false), "text/plain", f)
                         close(f)
                     end
 
