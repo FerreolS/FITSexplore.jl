@@ -9,7 +9,7 @@ module FITSexplore
 
 export fitsexplore
 
-using AstroFITS, FITSHeaders, ArgParse, PrecompileTools, StatsBase, UnicodePlots
+using AstroFITS, FITSHeaders, ArgParse, PrecompileTools, StatsBase #, UnicodePlots
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
 
@@ -362,9 +362,9 @@ function main(args = ARGS)
         "--stats", "-s"
         action = :store_true
         help = "Print the statistics of all image HDU"
-        "--plot", "-p"
+        #=         "--plot", "-p"
         action = :store_true
-        help = "show the statistic and plot all  HDU"
+        help = "show the statistic and plot all  HDU" =#
         "--hdu", "-u"
         nargs = 1
         action = :append_arg
@@ -412,7 +412,7 @@ function main(args = ARGS)
 
     head::Bool = parsed_args["header"]
     stats::Bool = parsed_args["stats"]
-    plott::Bool = parsed_args["plot"]
+    plott::Bool = false #parsed_args["plot"]
 
     return if !isempty(parsed_args["keyword"]) || !isempty(parsed_args["keyword-optional"])
         parse_keywords(files, parsed_args["keyword"], parsed_args["keyword-optional"])
@@ -451,14 +451,14 @@ function main(args = ARGS)
                                         data = read(hdu)
                                         (minn, maxx) = print_stats(read(hdu))
                                         println()
-                                        if plott
+                                        #=                                         if plott
                                             if ndims(data) == 3
                                                 display(heatmap(clamp.(mean(data, dims = 3)[:, :, 1], minn, maxx)'))
                                             else
                                                 display(heatmap(clamp.(data, minn, maxx)'))
                                             end
 
-                                        end
+                                        end =#
                                     end
                                 end
                             end
@@ -472,14 +472,14 @@ function main(args = ARGS)
                                         data = read(hdu)
                                         (minn, maxx) = print_stats(read(hdu))
                                         println()
-                                        if plott
+                                        #= if plott
                                             if ndims(data) == 3
                                                 display(heatmap(clamp.(mean(data, dims = 3)[:, :, 1], minn, maxx)'))
                                             else
                                                 display(heatmap(clamp.(data, minn, maxx)'))
                                             end
 
-                                        end
+                                        end =#
                                     end
                                 end
                             end
@@ -525,7 +525,7 @@ end
                         main(["-k", "NAXIS", "-K", "OBJECT", sample_file])
                         main(["-f", "NAXIS", "2", sample_file])
                     end
-                    display(heatmap(rand(10, 10)))
+                    #display(heatmap(rand(10, 10)))
                     parse_keywords(String[], ["NAXIS"], String[])
                     parse_filter(String[], ["NAXIS", "2"])
                     comparekeys(2, "2")
