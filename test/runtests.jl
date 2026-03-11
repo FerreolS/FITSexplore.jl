@@ -9,6 +9,9 @@ using FITSexplore
     # Build a minimal FITS file with one image HDU.
     writefits!(fits_path, FitsHeader(), reshape(collect(1:4), 2, 2); overwrite = true)
 
+    bad_fits_path = joinpath(tmpdir, "broken.fits")
+    write(bad_fits_path, "THIS IS NOT A VALID FITS HEADER")
+
     @testset "--hdu prints selected headers" begin
         @test_nowarn FITSexplore.main(["--hdu", "1", fits_path])
     end
@@ -70,6 +73,13 @@ using FITSexplore
         filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$fits_path\"])"`
         filter_out = read(pipeline(filter_cmd, stderr = devnull), String)
         @test occursin(fits_path, filter_out)
+
+        # Malformed FITS files should be skipped instead of crashing.
+        bad_kw_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"$bad_fits_path\"])"`
+        @test success(pipeline(bad_kw_cmd, stdout = devnull, stderr = devnull))
+
+        bad_filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$bad_fits_path\"])"`
+        @test success(pipeline(bad_filter_cmd, stdout = devnull, stderr = devnull))
     end
 
     @testset "helpers coverage" begin

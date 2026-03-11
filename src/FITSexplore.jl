@@ -36,6 +36,24 @@ function read_header(filename::AbstractString, index::Integer)
     return readfits(FitsHeader, filename; ext = index)
 end
 
+function try_read_header(filename::AbstractString)
+    try
+        return read_header(filename)
+    catch err
+        @warn "cannot read FITS header, skipping file" filename exception = (err, catch_backtrace())
+        return nothing
+    end
+end
+
+function try_read_header(filename::AbstractString, index::Integer)
+    try
+        return read_header(filename, index)
+    catch err
+        @warn "cannot read FITS header, skipping file/HDU" filename index exception = (err, catch_backtrace())
+        return nothing
+    end
+end
+
 """
 has_suffix(chain, patterns)
 
@@ -107,7 +125,10 @@ function fitsexplore(dir::String)
     filedict = Dict{String, FitsHeader}()
     for filename in readdir(dir, join = true)
         if isfile(filename) && has_suffix(filename, suffixes)
-            filedict[filename] = read_header(filename)
+            header = try_read_header(filename)
+            if !isnothing(header)
+                filedict[filename] = header
+            end
         end
     end
     return filedict
@@ -118,7 +139,8 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywords
     for filename in args
         if isfile(filename)
             if has_suffix(filename, suffixes)
-                header = read_header(filename)
+                header = try_read_header(filename)
+                isnothing(header) && continue
                 values = String[]
                 isrequired = true
                 for key in keywords
@@ -163,7 +185,8 @@ end
 function parse_keywords(args::Vector{String}, keywords::Set{String})
     for filename in args
         if isfile(filename) && has_suffix(filename, suffixes)
-            header = read_header(filename)
+            header = try_read_header(filename)
+            isnothing(header) && continue
             if all(keyword in keys(header) for keyword in keywords)
                 str = join([header_value(header, key) for key in keywords], "\t")
                 println(filename, "\t", str)
@@ -176,13 +199,13 @@ end
 function parse_filter(args::Vector{String}, filter::Vector{String})
     for filename in args
         if isfile(filename) && has_suffix(filename, suffixes)
-            header = read_header(filename)
+            header = try_read_header(filename)
+            isnothing(header) && continue
             if haskey(header, filter[1])
                 if comparekeys(header_value(header, filter[1]), filter[2])
                     println(filename)
                 end
             end
-
         end
     end
     return
@@ -350,10 +373,16 @@ function main(args = ARGS)
                     if head
                         if !isempty(parsed_args["hdu"])
                             for index in reduce(vcat, parsed_args["hdu"])
-                                @show read_header(filename, index)
+                                hdr = try_read_header(filename, index)
+                                if !isnothing(hdr)
+                                    @show hdr
+                                end
                             end
                         else
-                            @show read_header(filename)
+                            hdr = try_read_header(filename)
+                            if !isnothing(hdr)
+                                @show hdr
+                            end
                         end
                     elseif (stats || plott)
                         f = openfits(filename)
@@ -406,7 +435,10 @@ function main(args = ARGS)
                         close(f)
                     elseif !isempty(parsed_args["hdu"])
                         for index in reduce(vcat, parsed_args["hdu"])
-                            @show read_header(filename, index)
+                            hdr = try_read_header(filename, index)
+                            if !isnothing(hdr)
+                                @show hdr
+                            end
                         end
                     else
                         f = openfits(filename)
