@@ -9,7 +9,7 @@ module FITSexplore
 
 export fitsexplore
 
-using FITSIO, ArgParse, StatsBase, UnicodePlots
+using AstroFITS, FITSHeaders, ArgParse, StatsBase, UnicodePlots
 
 const suffixes = [".fits", ".fits.gz","fits.Z",".oifits",".oifits.gz",".oifits.Z"]
 
@@ -21,6 +21,19 @@ function julia_main()::Cint
 		return 1
 	end
 	return 0
+end
+
+# Compatibility helpers for AstroFITS card/value API.
+header_value(hdr, key::AbstractString) = hdr[key].value()
+
+function read_header(filename::AbstractString)
+	# Header-only read path using FITSHeaders.FitsHeader.
+	return readfits(FitsHeader, filename)
+end
+
+function read_header(filename::AbstractString, index::Integer)
+	# Select a specific HDU by extension index without reading image data.
+	return readfits(FitsHeader, filename; ext=index)
 end
 
 """
@@ -42,33 +55,33 @@ newlist = filtercat(filelist,keyword,value)
 
 Build a `newlist` dictionnary of all files where `fitsheader[keyword] == value`.
 """
-function filtercat(filelist::Dict{String, FITSHeader},
+function filtercat(filelist::Dict{String, FitsHeader},
 	keyword::String,
 	values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}})
-	newlist = Dict{String, FITSHeader}()
+	newlist = Dict{String, FitsHeader}()
 	for value in values
 		merge!(newlist, filtercat(filelist,keyword,value))
 	end
 	return newlist
 end
 
-function filtercat(filelist::Dict{String, FITSHeader},
+function filtercat(filelist::Dict{String, FitsHeader},
 	keyword::String,
 	value::Union{String, Bool, Integer, AbstractFloat, Nothing})
-	try tmp = filter(p->p.second[keyword] == value,filelist)
+	try tmp = filter(p -> header_value(p.second, keyword) == value, filelist)
 		return  tmp
 	catch
-		return Dict{String, FITSHeader}()
+		return Dict{String, FitsHeader}()
 	end
 end
 
-function filtercat2(filelist::Dict{String, FITSHeader},
+function filtercat2(filelist::Dict{String, FitsHeader},
                     keyword::String,
                     values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}})
-    newlist = Dict{String, FITSHeader}()
+    newlist = Dict{String, FitsHeader}()
     for (filename, header) in filelist
         for value in values
-            if haskey(header, keyword) && header[keyword] == value
+			if haskey(header, keyword) && header_value(header, keyword) == value
                 newlist[filename] = header
                 break
             end
@@ -77,14 +90,14 @@ function filtercat2(filelist::Dict{String, FITSHeader},
     return newlist
 end
 
-function filtercat3(filelist::Dict{String, FITSHeader}, keyword::String, values::AbstractVector)
-    filtered = filter(file -> haskey(file[2], keyword) && file[2][keyword] in values, filelist)
+function filtercat3(filelist::Dict{String, FitsHeader}, keyword::String, values::AbstractVector)
+	filtered = filter(file -> haskey(file[2], keyword) && header_value(file[2], keyword) in values, filelist)
     return Dict(filtered)
 end
 
 
 function fitsexplore(dir::String)
-    filedict = Dict{String, FITSHeader}()
+	filedict = Dict{String, FitsHeader}()
     for filename in readdir(dir, join=true)
 		if isfile(filename) && has_suffix(filename, suffixes)
             filedict[filename] = read_header(filename)
@@ -107,7 +120,7 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String} )
 				iskeyword = true
 				for key in keywords
 					if haskey(header,key)
-						str = str * "\t" * string(header[key])
+						str = str * "\t" * string(header_value(header, key))
 					else
 						iskeyword = false
 					end
@@ -125,7 +138,7 @@ function parse_keywords(args::Vector{String}, keywords::Set{String})
 		if isfile(filename) && has_suffix(filename, suffixes)
             header = read_header(filename)
             if all(keyword in keys(header) for keyword in keywords)
-                str = join([header[key] for key in keywords], "\t")
+				str = join([header_value(header, key) for key in keywords], "\t")
               	println(filename, "\t", str)
             end
         end
@@ -137,7 +150,7 @@ function parse_filter(args::Vector{String}, filter::Vector{String} )
 		if isfile(filename) && has_suffix(filename,suffixes)
 			header  = read_header(filename)
 			if haskey(header,filter[1])
-				if comparekeys(header[filter[1]],filter[2])
+				if comparekeys(header_value(header, filter[1]),filter[2])
 					println(filename)
 				end
 			end
@@ -152,11 +165,11 @@ Filter the files in `filelist` based on the keyword-value pairs in `filter`.
 
 The function modifies `filelist` in place and removes the files that do not meet the filter criteria.
 """
-function filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
+function filter_keywords(filelist::Dict{String, FitsHeader}, filter::Dict{String,Any})
     for (filename, header) in filelist
         keep = true
         for (key, value) in filter
-            if !haskey(header, key) || header[key] != value
+			if !haskey(header, key) || header_value(header, key) != value
                 keep = false
                 break
             end
@@ -222,7 +235,7 @@ function print_stats(a)
 	return  (max(minn,med-3*madd),min(maxx,med+3*madd))
 end
 
-name(hdu::HDU) = FITSIO.fits_try_read_extname(hdu.fitsfile)
+name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
 
 
@@ -307,13 +320,13 @@ function (@main)(args)
 							@show read_header(filename)
 						end
 					elseif (stats || plott)
-						f= FITS(filename)
+						f= openfits(filename)
 
 						if !isempty(parsed_args["hdu"])
 							
 							for index ∈ reduce(vcat,parsed_args["hdu"])
 								hdu = f[index]
-								if isa(hdu, ImageHDU) 
+								if isa(hdu, FitsImageHDU)
 									if (size(hdu) == ())
 										continue
 									else
@@ -334,7 +347,7 @@ function (@main)(args)
 							end
 						else
 							for hdu ∈ f
-								if isa(hdu, ImageHDU) 
+								if isa(hdu, FitsImageHDU)
 									if (size(hdu) == ())
 										continue
 									else
@@ -354,12 +367,15 @@ function (@main)(args)
 								end
 							end
 						end
+						close(f)
 					elseif !isempty(parsed_args["hdu"])
 						for index in reduce(vcat, parsed_args["hdu"])
 							@show read_header(filename, index)
 						end
 					else
-						@show FITS(filename)
+						f = openfits(filename)
+						@show f
+						close(f)
 					end
 
 				end

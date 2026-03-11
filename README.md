@@ -23,9 +23,8 @@ contained in the files `TARGET`. The `TARGET` can contain any files with extensi
 
 ```console
 me@host:~$ fitsexplore GRAVI.fits.Z
-FITS(filename) = File: GRAVI.fits.Z
-Mode: "r" (read-only)
-HDUs: Num  Name                  Type
+FitsFile("GRAVI.fits.Z")
+HDU  Name                  Type
       1                          Image
       2    ARRAY_DESCRIPTION     Table
       3    ARRAY_GEOMETRY        Table
@@ -47,7 +46,7 @@ Display the FITS header of the `TARGET`
 
 ```console
 me@host:~$ fitsexplore -d file.fits
-read(FitsHeader, filename) = SIMPLE  =                    T / file does conform to FITS standard
+SIMPLE  =                    T / file does conform to FITS standard
 BITPIX  =                  -32 / number of bits per data pixel
 NAXIS   =                    2 / Dimensionality
 NAXIS1  =                  242 / width of row in bytes
@@ -61,7 +60,7 @@ CDELT1  = 6.944444444444445e-8 / Coord. incr. per pixel
 CDELT2  = 6.944444444444445e-8 / Coord. incr. per pixel
 CUNIT1  = 'deg     '           / Physical units for CDELT1 and CRVAL1
 CUNIT2  = 'deg     '           / Physical units for CDELT2 and CRVAL2
-HDUNAME = 'IMAGE-OI FINAL IMAGE' / Unique name for the image within the FITS file
+HDUNAME = 'IMAGE-OI FINAL IMAGE' / unique name for the image within the FITS file
 ```
 #### -s, --stats
 

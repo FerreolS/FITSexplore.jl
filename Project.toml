@@ -1,23 +1,24 @@
 name = "FITSexplore"
 uuid = "8adab973-ac17-4ec6-8b81-43cd6f4779d2"
-authors = ["Ferréol Soulez <ferreol.soulez@univ-lyon1.fr>"]
 version = "0.1.0"
+authors = ["Ferréol Soulez <ferreol.soulez@univ-lyon1.fr>"]
 
 [workspace]
 projects = ["test"]
 
-[apps]
-fitsexplore = {}
-
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
-FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
+AstroFITS = "34e54ef0-c5bf-48ab-9e5d-cca51f35ed77"
+FITSHeaders = "8163a04c-c153-4fb1-a498-3402381ec208"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
 ArgParse = "1"
-FITSIO = "0.17"
+AstroFITS = "1.1.0"
+FITSHeaders = "0.4"
 StatsBase = "0.34"
 UnicodePlots = "3"
 julia = "1.9"
+
+[apps.fitsexplore]

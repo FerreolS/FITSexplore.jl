@@ -1,5 +1,5 @@
 using Test
-using FITSIO
+using AstroFITS
 using FITSexplore
 
 @testset "FITSexplore CLI regressions" begin
@@ -7,9 +7,7 @@ using FITSexplore
     fits_path = joinpath(tmpdir, "sample.fits")
 
     # Build a minimal FITS file with one image HDU.
-    f = FITS(fits_path, "w")
-    write(f, reshape(collect(1:4), 2, 2))
-    close(f)
+    writefits!(fits_path, FitsHeader(), reshape(collect(1:4), 2, 2); overwrite=true)
 
     @testset "--hdu prints selected headers" begin
         @test_nowarn FITSexplore.main(["--hdu", "1", fits_path])
