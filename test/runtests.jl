@@ -47,6 +47,16 @@ using FITSexplore
         @test occursin(fits_path, kw_out)
         @test occursin("2", kw_out)
 
+        kw_optional_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"--keyword-optional\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
+        kw_optional_out = read(pipeline(kw_optional_cmd, stderr = devnull), String)
+        @test occursin(fits_path, kw_optional_out)
+        @test occursin("\t2\t ", kw_optional_out)
+
+        only_optional_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword-optional\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
+        only_optional_out = read(pipeline(only_optional_cmd, stderr = devnull), String)
+        @test occursin(fits_path, only_optional_out)
+        @test occursin("\t ", only_optional_out)
+
         filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$fits_path\"])"`
         filter_out = read(pipeline(filter_cmd, stderr = devnull), String)
         @test occursin(fits_path, filter_out)

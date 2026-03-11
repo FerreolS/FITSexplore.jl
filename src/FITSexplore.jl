@@ -114,31 +114,50 @@ function fitsexplore(dir::String)
 end
 
 
-function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}})
-    return parse_keywords(args, [k[1] for k in keywords])
-end
-
-function parse_keywords(args::Vector{String}, keywords::Vector{String})
+function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywordsoptional::Vector{String})
     for filename in args
         if isfile(filename)
             if has_suffix(filename, suffixes)
                 header = read_header(filename)
-                str = ""
-                iskeyword = true
+                values = String[]
+                isrequired = true
                 for key in keywords
                     if haskey(header, key)
-                        str = str * "\t" * string(header_value(header, key))
+                        push!(values, string(header_value(header, key)))
                     else
-                        iskeyword = false
+                        isrequired = false
                     end
                 end
-                if iskeyword
-                    println(filename, "\t", str)
+                if isrequired
+                    for key in keywordsoptional
+                        push!(values, haskey(header, key) ? string(header_value(header, key)) : " ")
+                    end
+                    println(filename, "\t", join(values, "\t"))
                 end
             end
         end
     end
     return
+end
+
+function parse_keywords(args::Vector{String}, keywords::Vector{String})
+    return parse_keywords(args, keywords, String[])
+end
+
+function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}}, keywordsoptional::Vector{Vector{String}})
+    return parse_keywords(args, first.(keywords), first.(keywordsoptional))
+end
+
+function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywordsoptional::Vector{Vector{String}})
+    return parse_keywords(args, keywords, first.(keywordsoptional))
+end
+
+function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}}, keywordsoptional::Vector{String})
+    return parse_keywords(args, first.(keywords), keywordsoptional)
+end
+
+function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}})
+    return parse_keywords(args, first.(keywords), String[])
 end
 
 function parse_keywords(args::Vector{String}, keywords::Set{String})
@@ -280,7 +299,12 @@ function main(args = ARGS)
         nargs = 1
         action = :append_arg
         arg_type = String
-        help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword"
+        help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword. A file with a missing required KEYWORD is not displayed."
+        "--keyword-optional", "-K"
+        nargs = 1
+        action = :append_arg
+        arg_type = String
+        help = "Optional variant of --keyword: if KEYWORD is missing, print a single space instead. Optional keywords are printed after required keywords."
         "--filter", "-f"
         help = "filter"
         arg_type = String
@@ -315,8 +339,8 @@ function main(args = ARGS)
     stats::Bool = parsed_args["stats"]
     plott::Bool = parsed_args["plot"]
 
-    return if !isempty(parsed_args["keyword"])
-        parse_keywords(files, parsed_args["keyword"])
+    return if !isempty(parsed_args["keyword"]) || !isempty(parsed_args["keyword-optional"])
+        parse_keywords(files, parsed_args["keyword"], parsed_args["keyword-optional"])
     elseif !isempty(parsed_args["filter"])
         parse_filter(files, parsed_args["filter"])
     else
