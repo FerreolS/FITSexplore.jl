@@ -511,25 +511,29 @@ end
     keyword_optional_args = ["-k", "NAXIS", "-K", "OBJECT", "dummy.fits"]
     filter_args = ["-f", "NAXIS", "2", "dummy.fits"]
     @compile_workload begin
-        try
-            main(keyword_args)
-            main(keyword_optional_args)
-            main(filter_args)
-            if isfile(sample_file)
-                main([sample_file])
-                main(["-d", sample_file])
-                main(["-u", "1", sample_file])
-                main(["-k", "NAXIS", sample_file])
-                main(["-k", "NAXIS", "-K", "OBJECT", sample_file])
-                main(["-f", "NAXIS", "2", sample_file])
+        redirect_stdout(devnull) do
+            redirect_stderr(devnull) do
+                try
+                    main(keyword_args)
+                    main(keyword_optional_args)
+                    main(filter_args)
+                    if isfile(sample_file)
+                        main([sample_file])
+                        main(["-d", sample_file])
+                        main(["-u", "1", sample_file])
+                        main(["-k", "NAXIS", sample_file])
+                        main(["-k", "NAXIS", "-K", "OBJECT", sample_file])
+                        main(["-f", "NAXIS", "2", sample_file])
+                    end
+                    parse_keywords(String[], ["NAXIS"], String[])
+                    parse_filter(String[], ["NAXIS", "2"])
+                    comparekeys(2, "2")
+                    comparekeys("A", "A")
+                    comparekeys(true, "true")
+                catch
+                    # Ignore runtime errors here; the goal is to record compilation edges.
+                end
             end
-            parse_keywords(String[], ["NAXIS"], String[])
-            parse_filter(String[], ["NAXIS", "2"])
-            comparekeys(2, "2")
-            comparekeys("A", "A")
-            comparekeys(true, "true")
-        catch
-            # Ignore runtime errors here; the goal is to record compilation edges.
         end
     end
 end
