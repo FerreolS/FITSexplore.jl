@@ -342,6 +342,71 @@ end
 
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
+show_plain(x) = show(IOContext(stdout, :limit => false), "text/plain", x)
+
+function collect_hdu_indices(raw_hdu)::Vector{Int}
+    isempty(raw_hdu) && return Int[]
+    return Int[i for i in reduce(vcat, raw_hdu)]
+end
+
+function show_header_mode(filename::String, hdu_indices::Vector{Int})
+    if isempty(hdu_indices)
+        hdr = try_read_header(filename)
+        !isnothing(hdr) && show_plain(hdr)
+        return
+    end
+    for index in hdu_indices
+        hdr = try_read_header(filename, index)
+        !isnothing(hdr) && show_plain(hdr)
+    end
+end
+
+function print_hdu_stats(filename::String, hdu)
+    isa(hdu, FitsImageHDU) || return
+    size(hdu) == () && return
+    println(filename, "  hdu :", name(hdu))
+    print_stats(read(hdu))
+    println()
+end
+
+function show_stats_mode(filename::String, hdu_indices::Vector{Int})
+    f = openfits(filename)
+    try
+        if isempty(hdu_indices)
+            for hdu in f
+                print_hdu_stats(filename, hdu)
+            end
+        else
+            for index in hdu_indices
+                print_hdu_stats(filename, f[index])
+            end
+        end
+    finally
+        close(f)
+    end
+end
+
+function show_file_mode(filename::String)
+    f = openfits(filename)
+    try
+        show_plain(f)
+    finally
+        close(f)
+    end
+end
+
+function process_file_mode(filename::String, head::Bool, stats::Bool, hdu_indices::Vector{Int})
+    if head
+        show_header_mode(filename, hdu_indices)
+    elseif stats
+        show_stats_mode(filename, hdu_indices)
+    elseif !isempty(hdu_indices)
+        show_header_mode(filename, hdu_indices)
+    else
+        show_file_mode(filename)
+    end
+end
+
 
 function main(args = ARGS)
 
@@ -362,9 +427,9 @@ function main(args = ARGS)
         "--stats", "-s"
         action = :store_true
         help = "Print the statistics of all image HDU"
-        #=         "--plot", "-p"
-        action = :store_true
-        help = "show the statistic and plot all  HDU" =#
+        # "--plot", "-p"
+        # action = :store_true
+        # help = "show the statistic and plot all  HDU"
         "--hdu", "-u"
         nargs = 1
         action = :append_arg
@@ -412,7 +477,7 @@ function main(args = ARGS)
 
     head::Bool = parsed_args["header"]
     stats::Bool = parsed_args["stats"]
-    plott::Bool = false #parsed_args["plot"]
+    hdu_indices::Vector{Int} = collect_hdu_indices(parsed_args["hdu"])
 
     return if !isempty(parsed_args["keyword"]) || !isempty(parsed_args["keyword-optional"])
         parse_keywords(files, parsed_args["keyword"], parsed_args["keyword-optional"])
@@ -420,86 +485,8 @@ function main(args = ARGS)
         parse_filter(files, parsed_args["filter"])
     else
         for filename in files
-            if isfile(filename)
-                if has_suffix(filename, suffixes)
-                    if head
-                        if !isempty(parsed_args["hdu"])
-                            for index in reduce(vcat, parsed_args["hdu"])
-                                hdr = try_read_header(filename, index)
-                                if !isnothing(hdr)
-                                    show(IOContext(stdout, :limit => false), "text/plain", hdr)
-                                end
-                            end
-                        else
-                            hdr = try_read_header(filename)
-                            if !isnothing(hdr)
-                                show(IOContext(stdout, :limit => false), "text/plain", hdr)
-                            end
-                        end
-                    elseif (stats || plott)
-                        f = openfits(filename)
-
-                        if !isempty(parsed_args["hdu"])
-
-                            for index in reduce(vcat, parsed_args["hdu"])
-                                hdu = f[index]
-                                if isa(hdu, FitsImageHDU)
-                                    if (size(hdu) == ())
-                                        continue
-                                    else
-                                        println(filename, "  hdu :", name(hdu))
-                                        data = read(hdu)
-                                        (minn, maxx) = print_stats(read(hdu))
-                                        println()
-                                        #=                                         if plott
-                                            if ndims(data) == 3
-                                                display(heatmap(clamp.(mean(data, dims = 3)[:, :, 1], minn, maxx)'))
-                                            else
-                                                display(heatmap(clamp.(data, minn, maxx)'))
-                                            end
-
-                                        end =#
-                                    end
-                                end
-                            end
-                        else
-                            for hdu in f
-                                if isa(hdu, FitsImageHDU)
-                                    if (size(hdu) == ())
-                                        continue
-                                    else
-                                        println(filename, "  hdu :", name(hdu))
-                                        data = read(hdu)
-                                        (minn, maxx) = print_stats(read(hdu))
-                                        println()
-                                        #= if plott
-                                            if ndims(data) == 3
-                                                display(heatmap(clamp.(mean(data, dims = 3)[:, :, 1], minn, maxx)'))
-                                            else
-                                                display(heatmap(clamp.(data, minn, maxx)'))
-                                            end
-
-                                        end =#
-                                    end
-                                end
-                            end
-                        end
-                        close(f)
-                    elseif !isempty(parsed_args["hdu"])
-                        for index in reduce(vcat, parsed_args["hdu"])
-                            hdr = try_read_header(filename, index)
-                            if !isnothing(hdr)
-                                show(IOContext(stdout, :limit => false), "text/plain", hdr)
-                            end
-                        end
-                    else
-                        f = openfits(filename)
-                        show(IOContext(stdout, :limit => false), "text/plain", f)
-                        close(f)
-                    end
-
-                end
-            end
+            (isfile(filename) && has_suffix(filename, suffixes)) || continue
+            process_file_mode(filename, head, stats, hdu_indices)
         end
     end
 
