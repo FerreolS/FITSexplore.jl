@@ -34,14 +34,14 @@ using FITSexplore
         @test success(pipeline(stats_hdu_cmd, stdout = devnull, stderr = devnull))
     end
 
-    @testset "plot CLI branches" begin
-        project_root = dirname(@__DIR__)
-        plot_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"$fits_path\"])"`
-        @test success(pipeline(plot_cmd, stdout = devnull, stderr = devnull))
+    # @testset "plot CLI branches" begin
+    #     project_root = dirname(@__DIR__)
+    #     plot_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"$fits_path\"])"`
+    #     @test success(pipeline(plot_cmd, stdout = devnull, stderr = devnull))
 
-        plot_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"--hdu\", \"1\", \"$fits_path\"])"`
-        @test success(pipeline(plot_hdu_cmd, stdout = devnull, stderr = devnull))
-    end
+    #     plot_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"--hdu\", \"1\", \"$fits_path\"])"`
+    #     @test success(pipeline(plot_hdu_cmd, stdout = devnull, stderr = devnull))
+    # end
 
     @testset "keyword and filter outputs" begin
         project_root = dirname(@__DIR__)

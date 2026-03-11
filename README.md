@@ -112,13 +112,14 @@ fitsexplore -s file.fits
 file.fits  hdu :SCI
 size     type            mean   std     median  mad
 (640, 640)      Float32         16170.782       10711.193       17808.355       10895.537
--35147.19           █      ▁▁▁▁▂▁▁▂▂▂▂▂▁▁▁▁               52474.26
  
  ``` 
  
+<!--
 #### -p, --plot
 
- Display statistical information and plot all image HDU: 
+ Display statistical information and plot all image HDU:
+-->
  
 ### Other examples
 
