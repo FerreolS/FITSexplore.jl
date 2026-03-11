@@ -11,29 +11,29 @@ export fitsexplore
 
 using AstroFITS, FITSHeaders, ArgParse, StatsBase, UnicodePlots
 
-const suffixes = [".fits", ".fits.gz","fits.Z",".oifits",".oifits.gz",".oifits.Z"]
+const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
 
 function julia_main()::Cint
-	try
-		main(ARGS)
-	catch
-		Base.invokelatest(Base.display_error, Base.catch_stack())
-		return 1
-	end
-	return 0
+    try
+        main(ARGS)
+    catch
+        Base.invokelatest(Base.display_error, Base.catch_stack())
+        return 1
+    end
+    return 0
 end
 
 # Compatibility helpers for AstroFITS card/value API.
 header_value(hdr, key::AbstractString) = hdr[key].value()
 
 function read_header(filename::AbstractString)
-	# Header-only read path using FITSHeaders.FitsHeader.
-	return readfits(FitsHeader, filename)
+    # Header-only read path using FITSHeaders.FitsHeader.
+    return readfits(FitsHeader, filename)
 end
 
 function read_header(filename::AbstractString, index::Integer)
-	# Select a specific HDU by extension index without reading image data.
-	return readfits(FitsHeader, filename; ext=index)
+    # Select a specific HDU by extension index without reading image data.
+    return readfits(FitsHeader, filename; ext = index)
 end
 
 """
@@ -42,12 +42,12 @@ has_suffix(chain, patterns)
 Return `true` if `chain` ends with at least one suffix in `patterns`.
 """
 function has_suffix(chain::AbstractString, patterns::AbstractVector{<:AbstractString})
-	for suffix in patterns
-		if endswith(chain, suffix)
-			return true
-		end
-	end
-	return false
+    for suffix in patterns
+        if endswith(chain, suffix)
+            return true
+        end
+    end
+    return false
 end
 
 """
@@ -55,33 +55,40 @@ newlist = filtercat(filelist,keyword,value)
 
 Build a `newlist` dictionnary of all files where `fitsheader[keyword] == value`.
 """
-function filtercat(filelist::Dict{String, FitsHeader},
-	keyword::String,
-	values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}})
-	newlist = Dict{String, FitsHeader}()
-	for value in values
-		merge!(newlist, filtercat(filelist,keyword,value))
-	end
-	return newlist
+function filtercat(
+        filelist::Dict{String, FitsHeader},
+        keyword::String,
+        values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}
+    )
+    newlist = Dict{String, FitsHeader}()
+    for value in values
+        merge!(newlist, filtercat(filelist, keyword, value))
+    end
+    return newlist
 end
 
-function filtercat(filelist::Dict{String, FitsHeader},
-	keyword::String,
-	value::Union{String, Bool, Integer, AbstractFloat, Nothing})
-	try tmp = filter(p -> header_value(p.second, keyword) == value, filelist)
-		return  tmp
-	catch
-		return Dict{String, FitsHeader}()
-	end
+function filtercat(
+        filelist::Dict{String, FitsHeader},
+        keyword::String,
+        value::Union{String, Bool, Integer, AbstractFloat, Nothing}
+    )
+    try
+        tmp = filter(p -> header_value(p.second, keyword) == value, filelist)
+        return tmp
+    catch
+        return Dict{String, FitsHeader}()
+    end
 end
 
-function filtercat2(filelist::Dict{String, FitsHeader},
-                    keyword::String,
-                    values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}})
+function filtercat2(
+        filelist::Dict{String, FitsHeader},
+        keyword::String,
+        values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}
+    )
     newlist = Dict{String, FitsHeader}()
     for (filename, header) in filelist
         for value in values
-			if haskey(header, keyword) && header_value(header, keyword) == value
+            if haskey(header, keyword) && header_value(header, keyword) == value
                 newlist[filename] = header
                 break
             end
@@ -91,15 +98,15 @@ function filtercat2(filelist::Dict{String, FitsHeader},
 end
 
 function filtercat3(filelist::Dict{String, FitsHeader}, keyword::String, values::AbstractVector)
-	filtered = filter(file -> haskey(file[2], keyword) && header_value(file[2], keyword) in values, filelist)
+    filtered = filter(file -> haskey(file[2], keyword) && header_value(file[2], keyword) in values, filelist)
     return Dict(filtered)
 end
 
 
 function fitsexplore(dir::String)
-	filedict = Dict{String, FitsHeader}()
-    for filename in readdir(dir, join=true)
-		if isfile(filename) && has_suffix(filename, suffixes)
+    filedict = Dict{String, FitsHeader}()
+    for filename in readdir(dir, join = true)
+        if isfile(filename) && has_suffix(filename, suffixes)
             filedict[filename] = read_header(filename)
         end
     end
@@ -107,56 +114,59 @@ function fitsexplore(dir::String)
 end
 
 
-function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}} )
-	parse_keywords(args,[k[1] for k in keywords])
+function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}})
+    return parse_keywords(args, [k[1] for k in keywords])
 end
 
-function parse_keywords(args::Vector{String}, keywords::Vector{String} )
-	for filename in args
-		if isfile(filename)
-			if has_suffix(filename,suffixes)
-				header  = read_header(filename)
-				str = ""
-				iskeyword = true
-				for key in keywords
-					if haskey(header,key)
-						str = str * "\t" * string(header_value(header, key))
-					else
-						iskeyword = false
-					end
-				end
-				if iskeyword
-					println(filename ,"\t", str)
-				end
-			end
-		end
-	end
+function parse_keywords(args::Vector{String}, keywords::Vector{String})
+    for filename in args
+        if isfile(filename)
+            if has_suffix(filename, suffixes)
+                header = read_header(filename)
+                str = ""
+                iskeyword = true
+                for key in keywords
+                    if haskey(header, key)
+                        str = str * "\t" * string(header_value(header, key))
+                    else
+                        iskeyword = false
+                    end
+                end
+                if iskeyword
+                    println(filename, "\t", str)
+                end
+            end
+        end
+    end
+    return
 end
 
 function parse_keywords(args::Vector{String}, keywords::Set{String})
     for filename in args
-		if isfile(filename) && has_suffix(filename, suffixes)
+        if isfile(filename) && has_suffix(filename, suffixes)
             header = read_header(filename)
             if all(keyword in keys(header) for keyword in keywords)
-				str = join([header_value(header, key) for key in keywords], "\t")
-              	println(filename, "\t", str)
+                str = join([header_value(header, key) for key in keywords], "\t")
+                println(filename, "\t", str)
             end
         end
     end
+    return
 end
 
-function parse_filter(args::Vector{String}, filter::Vector{String} )
-	for filename in args
-		if isfile(filename) && has_suffix(filename,suffixes)
-			header  = read_header(filename)
-			if haskey(header,filter[1])
-				if comparekeys(header_value(header, filter[1]),filter[2])
-					println(filename)
-				end
-			end
-			
-		end
-	end
+function parse_filter(args::Vector{String}, filter::Vector{String})
+    for filename in args
+        if isfile(filename) && has_suffix(filename, suffixes)
+            header = read_header(filename)
+            if haskey(header, filter[1])
+                if comparekeys(header_value(header, filter[1]), filter[2])
+                    println(filename)
+                end
+            end
+
+        end
+    end
+    return
 end
 """
 filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
@@ -165,11 +175,11 @@ Filter the files in `filelist` based on the keyword-value pairs in `filter`.
 
 The function modifies `filelist` in place and removes the files that do not meet the filter criteria.
 """
-function filter_keywords(filelist::Dict{String, FitsHeader}, filter::Dict{String,Any})
+function filter_keywords(filelist::Dict{String, FitsHeader}, filter::Dict{String, Any})
     for (filename, header) in filelist
         keep = true
         for (key, value) in filter
-			if !haskey(header, key) || header_value(header, key) != value
+            if !haskey(header, key) || header_value(header, key) != value
                 keep = false
                 break
             end
@@ -178,14 +188,15 @@ function filter_keywords(filelist::Dict{String, FitsHeader}, filter::Dict{String
             delete!(filelist, filename)
         end
     end
+    return
 end
 
 function comparekeys(key1::AbstractString, key2::AbstractString)
-    key1 == key2
+    return key1 == key2
 end
 
 function comparekeys(key1::Bool, key2::AbstractString)
-    if (lowercase(key2) == "true") | (lowercase(key2) == "t") | (key2 == "1")
+    return if (lowercase(key2) == "true") | (lowercase(key2) == "t") | (key2 == "1")
         key1
     elseif (lowercase(key2) == "false") | (lowercase(key2) == "f") | (key2 == "0")
         !key1
@@ -195,193 +206,194 @@ function comparekeys(key1::Bool, key2::AbstractString)
 end
 
 
-function comparekeys(key1::T,key2::AbstractString) where {T <: Number}
-	parsed = tryparse(T, key2)
-	return !isnothing(parsed) && key1 == parsed
+function comparekeys(key1::T, key2::AbstractString) where {T <: Number}
+    parsed = tryparse(T, key2)
+    return !isnothing(parsed) && key1 == parsed
 end
 
 
 function print_stats(a)
-	# println("size \t \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
-	# println(size(a), "\t", eltype(a),"\t",round.(minimum(a); digits=4),"\t",
-	#           round.(maximum(a); digits=4),"\t",round.(mean(a); digits=4),"\t",
-	#           round.(std(a); digits=4),"\t",round.(median(a); digits=4),"\t",
-	#           round.(mad(a); digits=4))
-	
-	
-	med= median(a)
-	madd= mad(a,center=med)
-	minn =round.(minimum(a); digits=4) 
-	maxx =round.(maximum(a); digits=4) 
-	println(
-		"size ", size(a), "  eltype ", eltype(a),
-		"  mean ", round.(mean(a); digits=4), "  std ", round.(std(a); digits=4),
-		"  median ", round.(med; digits=4), "  mad ", round.(madd; digits=4)
-	)
-	try 
-		h = fit(Histogram,a[:], range(max(minn,med-3*madd),min(maxx,med+3*madd),50)) 
-		W = h.weights
-		barsyms = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
-		symidxs = eachindex(barsyms)
-		norm_factor = length(symidxs) / maximum(W)
-		get_sym_idx(x) = isnan(x) ? 1 : clamp(first(symidxs) + floor(Int, norm_factor * x), first(symidxs), last(symidxs))
-		print(minn)
-		print(String(barsyms[get_sym_idx.(W)]))
-		print(maxx)
-	catch e
-		@warn "cannot compute histogram" e
-		return (minn, maxx)
-	end
-	return  (max(minn,med-3*madd),min(maxx,med+3*madd))
+    # println("size \t \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
+    # println(size(a), "\t", eltype(a),"\t",round.(minimum(a); digits=4),"\t",
+    #           round.(maximum(a); digits=4),"\t",round.(mean(a); digits=4),"\t",
+    #           round.(std(a); digits=4),"\t",round.(median(a); digits=4),"\t",
+    #           round.(mad(a); digits=4))
+
+
+    med = median(a)
+    madd = mad(a, center = med, normalize = true)
+    minn = round.(minimum(a); digits = 4)
+    maxx = round.(maximum(a); digits = 4)
+    println(
+        "size ", size(a), "  eltype ", eltype(a),
+        "  mean ", round.(mean(a); digits = 4), "  std ", round.(std(a); digits = 4),
+        "  median ", round.(med; digits = 4), "  mad ", round.(madd; digits = 4)
+    )
+    try
+        h = fit(Histogram, a[:], range(max(minn, med - 3 * madd), min(maxx, med + 3 * madd), 50))
+        W = h.weights
+        barsyms = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
+        symidxs = eachindex(barsyms)
+        norm_factor = length(symidxs) / maximum(W)
+        get_sym_idx(x) = isnan(x) ? 1 : clamp(first(symidxs) + floor(Int, norm_factor * x), first(symidxs), last(symidxs))
+        print(minn)
+        print(String(barsyms[get_sym_idx.(W)]))
+        print(maxx)
+    catch e
+        @warn "cannot compute histogram" e
+        return (minn, maxx)
+    end
+    return (max(minn, med - 3 * madd), min(maxx, med + 3 * madd))
 end
 
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
 
-
 function main(args = ARGS)
-	
-	settings = ArgParseSettings(prog = "FITSexplore",
-	#version = @project_version,
-	version = "0.2",
-	add_version = true)
-	
-	settings.description =  "Simple tool to explore the content of FITS files.\n\n"*
-	"Without any argument, it will display the name and the type of all HDU contained in the files TARGET."
-	@add_arg_table! settings begin
-		"--header", "-d"
-		help = "header"
-		action = :store_true
-		help = "Print the whole FITS header."
-		"--stats", "-s"
-		action = :store_true
-		help = "Print the statistics of all image HDU"
-		"--plot", "-p"
-		action = :store_true
-		help = "show the statistic and plot all  HDU"
-		"--hdu", "-u"
-		nargs = 1
-		action = :append_arg
-		arg_type = Int
-		help = "Select the hdu by number in conjunction with -p, -s, -d"
-		"--keyword", "-k"
-		nargs = 1
-		action = :append_arg
-		arg_type = String
-		help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword"
-		"--filter", "-f"
-		help = "filter"
-		arg_type = String
-		nargs = 2
-		metavar = ["KEYWORD", "VALUE"]
-		help = "Print all files where the FITS header KEYWORD = VALUE."
-		"--recursive", "-r"
-		help = "Recursively explore entire directories."
-		action = :store_true
-		"TARGET"
-		nargs = '*'
-		arg_type = String
-		help = "List of all TARGET to explore. In conjunction with -r TARGET can contain directories."
-		default = ["."]
-	end
 
-	parsed_args = parse_args(args, settings)
+    settings = ArgParseSettings(
+        prog = "FITSexplore",
+        #version = @project_version,
+        version = "0.2",
+        add_version = true
+    )
 
-	args =parsed_args["TARGET"];
+    settings.description = "Simple tool to explore the content of FITS files.\n\n" *
+        "Without any argument, it will display the name and the type of all HDU contained in the files TARGET."
+    @add_arg_table! settings begin
+        "--header", "-d"
+        help = "header"
+        action = :store_true
+        help = "Print the whole FITS header."
+        "--stats", "-s"
+        action = :store_true
+        help = "Print the statistics of all image HDU"
+        "--plot", "-p"
+        action = :store_true
+        help = "show the statistic and plot all  HDU"
+        "--hdu", "-u"
+        nargs = 1
+        action = :append_arg
+        arg_type = Int
+        help = "Select the hdu by number in conjunction with -p, -s, -d"
+        "--keyword", "-k"
+        nargs = 1
+        action = :append_arg
+        arg_type = String
+        help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword"
+        "--filter", "-f"
+        help = "filter"
+        arg_type = String
+        nargs = 2
+        metavar = ["KEYWORD", "VALUE"]
+        help = "Print all files where the FITS header KEYWORD = VALUE."
+        "--recursive", "-r"
+        help = "Recursively explore entire directories."
+        action = :store_true
+        "TARGET"
+        nargs = '*'
+        arg_type = String
+        help = "List of all TARGET to explore. In conjunction with -r TARGET can contain directories."
+        default = ["."]
+    end
 
-	files = Vector{String}()
-	for arg in args
-		if isdir(arg) && parsed_args["recursive"]
-			files =  vcat(files,[root*"/"*filename for (root, dirs, TARGET) in walkdir(arg) for filename in TARGET  ])
-		else
-			files =  vcat(files,arg)
-		end
-	end
+    parsed_args = parse_args(args, settings)
+
+    args = parsed_args["TARGET"]
+
+    files = Vector{String}()
+    for arg in args
+        if isdir(arg) && parsed_args["recursive"]
+            files = vcat(files, [root * "/" * filename for (root, dirs, TARGET) in walkdir(arg) for filename in TARGET  ])
+        else
+            files = vcat(files, arg)
+        end
+    end
 
 
-	head::Bool =  parsed_args["header"];
-	stats::Bool =  parsed_args["stats"];
-	plott::Bool =  parsed_args["plot"];
+    head::Bool = parsed_args["header"]
+    stats::Bool = parsed_args["stats"]
+    plott::Bool = parsed_args["plot"]
 
-	if !isempty(parsed_args["keyword"])
-		parse_keywords(files,parsed_args["keyword"])
-	elseif !isempty(parsed_args["filter"])
-		parse_filter(files,parsed_args["filter"])
-	else
-		for filename in files
-			if isfile(filename)
-				if has_suffix(filename,suffixes)
-					if head
-						if !isempty(parsed_args["hdu"])
-							for index ∈ reduce(vcat,parsed_args["hdu"])
-								@show read_header(filename,index)
-							end
-						else
-							@show read_header(filename)
-						end
-					elseif (stats || plott)
-						f= openfits(filename)
+    return if !isempty(parsed_args["keyword"])
+        parse_keywords(files, parsed_args["keyword"])
+    elseif !isempty(parsed_args["filter"])
+        parse_filter(files, parsed_args["filter"])
+    else
+        for filename in files
+            if isfile(filename)
+                if has_suffix(filename, suffixes)
+                    if head
+                        if !isempty(parsed_args["hdu"])
+                            for index in reduce(vcat, parsed_args["hdu"])
+                                @show read_header(filename, index)
+                            end
+                        else
+                            @show read_header(filename)
+                        end
+                    elseif (stats || plott)
+                        f = openfits(filename)
 
-						if !isempty(parsed_args["hdu"])
-							
-							for index ∈ reduce(vcat,parsed_args["hdu"])
-								hdu = f[index]
-								if isa(hdu, FitsImageHDU)
-									if (size(hdu) == ())
-										continue
-									else
-										println(filename, "  hdu :", name(hdu))
-										data =read(hdu) 
-										(minn, maxx) = print_stats(read(hdu))
-										println()
-										if plott
-											if ndims(data) ==3
-												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)'))
-											else
-												display(heatmap(clamp.(data,minn,maxx)'))
-											end
-											
-										end
-									end
-								end
-							end
-						else
-							for hdu ∈ f
-								if isa(hdu, FitsImageHDU)
-									if (size(hdu) == ())
-										continue
-									else
-										println(filename, "  hdu :", name(hdu))
-										data =read(hdu) 
-										(minn, maxx) = print_stats(read(hdu))
-										println()
-										if plott
-											if ndims(data) ==3
-												display(heatmap(clamp.(mean(data,dims=3)[:,:,1],minn,maxx)'))
-											else
-												display(heatmap(clamp.(data,minn,maxx)'))
-											end
-											
-										end
-									end
-								end
-							end
-						end
-						close(f)
-					elseif !isempty(parsed_args["hdu"])
-						for index in reduce(vcat, parsed_args["hdu"])
-							@show read_header(filename, index)
-						end
-					else
-						f = openfits(filename)
-						@show f
-						close(f)
-					end
+                        if !isempty(parsed_args["hdu"])
 
-				end
-			end
-		end
-	end
+                            for index in reduce(vcat, parsed_args["hdu"])
+                                hdu = f[index]
+                                if isa(hdu, FitsImageHDU)
+                                    if (size(hdu) == ())
+                                        continue
+                                    else
+                                        println(filename, "  hdu :", name(hdu))
+                                        data = read(hdu)
+                                        (minn, maxx) = print_stats(read(hdu))
+                                        println()
+                                        if plott
+                                            if ndims(data) == 3
+                                                display(heatmap(clamp.(mean(data, dims = 3)[:, :, 1], minn, maxx)'))
+                                            else
+                                                display(heatmap(clamp.(data, minn, maxx)'))
+                                            end
+
+                                        end
+                                    end
+                                end
+                            end
+                        else
+                            for hdu in f
+                                if isa(hdu, FitsImageHDU)
+                                    if (size(hdu) == ())
+                                        continue
+                                    else
+                                        println(filename, "  hdu :", name(hdu))
+                                        data = read(hdu)
+                                        (minn, maxx) = print_stats(read(hdu))
+                                        println()
+                                        if plott
+                                            if ndims(data) == 3
+                                                display(heatmap(clamp.(mean(data, dims = 3)[:, :, 1], minn, maxx)'))
+                                            else
+                                                display(heatmap(clamp.(data, minn, maxx)'))
+                                            end
+
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        close(f)
+                    elseif !isempty(parsed_args["hdu"])
+                        for index in reduce(vcat, parsed_args["hdu"])
+                            @show read_header(filename, index)
+                        end
+                    else
+                        f = openfits(filename)
+                        @show f
+                        close(f)
+                    end
+
+                end
+            end
+        end
+    end
 
 end
 
