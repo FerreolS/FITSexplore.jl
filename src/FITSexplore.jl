@@ -318,12 +318,12 @@ function print_stats(a)
     madd = mad(a, center = med, normalize = true)
     minn = round.(minimum(a); digits = 4)
     maxx = round.(maximum(a); digits = 4)
-    println(
+    return println(
         "size ", size(a), "  eltype ", eltype(a),
         "  mean ", round.(mean(a); digits = 4), "  std ", round.(std(a); digits = 4),
         "  median ", round.(med; digits = 4), "  mad ", round.(madd; digits = 4)
     )
-    try
+    #=    try
         h = fit(Histogram, a[:], range(max(minn, med - 3 * madd), min(maxx, med + 3 * madd), 50))
         W = h.weights
         barsyms = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
@@ -337,7 +337,7 @@ function print_stats(a)
         @warn "cannot compute histogram" e
         return (minn, maxx)
     end
-    return (max(minn, med - 3 * madd), min(maxx, med + 3 * madd))
+    return (max(minn, med - 3 * madd), min(maxx, med + 3 * madd)) =#
 end
 
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
