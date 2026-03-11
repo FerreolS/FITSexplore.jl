@@ -199,7 +199,8 @@ end
 
 
 function comparekeys(key1::T,key2::AbstractString) where {T <: Number}
-	return key1==parse(T,key2)
+	parsed = tryparse(T, key2)
+	return !isnothing(parsed) && key1 == parsed
 end
 
 
@@ -370,7 +371,9 @@ function main(args)
 							end
 						end
 					elseif !isempty(parsed_args["hdu"])
-						@show read_header(filename[parsed_args["hdu"]])
+						for index in reduce(vcat, parsed_args["hdu"])
+							@show read_header(filename, index)
+						end
 					else
 						@show FITS(filename)
 					end
