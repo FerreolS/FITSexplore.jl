@@ -17,6 +17,68 @@ using FITSexplore
         @test_nowarn FITSexplore.main(["--filter", "NAXIS", "abc", fits_path])
     end
 
+    @testset "default and header CLI branches" begin
+        @test_nowarn FITSexplore.main([fits_path])
+        @test_nowarn FITSexplore.main(["--header", fits_path])
+    end
+
+    @testset "stats CLI branches" begin
+        project_root = dirname(@__DIR__)
+        stats_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"$fits_path\"])"`
+        @test success(pipeline(stats_cmd, stdout=devnull, stderr=devnull))
+
+        stats_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"--hdu\", \"1\", \"$fits_path\"])"`
+        @test success(pipeline(stats_hdu_cmd, stdout=devnull, stderr=devnull))
+    end
+
+    @testset "plot CLI branches" begin
+        project_root = dirname(@__DIR__)
+        plot_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"$fits_path\"])"`
+        @test success(pipeline(plot_cmd, stdout=devnull, stderr=devnull))
+
+        plot_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"--hdu\", \"1\", \"$fits_path\"])"`
+        @test success(pipeline(plot_hdu_cmd, stdout=devnull, stderr=devnull))
+    end
+
+    @testset "keyword and filter outputs" begin
+        project_root = dirname(@__DIR__)
+        kw_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"$fits_path\"])"`
+        kw_out = read(pipeline(kw_cmd, stderr=devnull), String)
+        @test occursin(fits_path, kw_out)
+        @test occursin("2", kw_out)
+
+        filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$fits_path\"])"`
+        filter_out = read(pipeline(filter_cmd, stderr=devnull), String)
+        @test occursin(fits_path, filter_out)
+    end
+
+    @testset "helpers coverage" begin
+        @test FITSexplore.comparekeys("A", "A")
+        @test FITSexplore.comparekeys(true, "true")
+        @test FITSexplore.comparekeys(true, "1")
+        @test FITSexplore.comparekeys(false, "false")
+        @test !FITSexplore.comparekeys(false, "notabool")
+        @test FITSexplore.comparekeys(2, "2")
+        @test !FITSexplore.comparekeys(2, "2.1")
+
+        headers = FITSexplore.fitsexplore(tmpdir)
+        @test haskey(headers, fits_path)
+
+        filtered = FITSexplore.filtercat(headers, "NAXIS", [2, 3])
+        @test haskey(filtered, fits_path)
+
+        exact_filtered = FITSexplore.filtercat(headers, "NAXIS", 2)
+        @test haskey(exact_filtered, fits_path)
+
+        dict_copy = copy(headers)
+        FITSexplore.filter_keywords(dict_copy, Dict{String,Any}("NAXIS" => 2))
+        @test haskey(dict_copy, fits_path)
+
+        dict_copy2 = copy(headers)
+        FITSexplore.filter_keywords(dict_copy2, Dict{String,Any}("NAXIS" => 3))
+        @test !haskey(dict_copy2, fits_path)
+    end
+
     @testset "App entrypoint" begin
         project_root = dirname(@__DIR__)
         # `-m Module` entry-point support was added in Julia 1.11; use -e on older versions.
