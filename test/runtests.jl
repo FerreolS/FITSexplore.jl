@@ -19,7 +19,12 @@ using FITSexplore
 
     @testset "App entrypoint" begin
         project_root = dirname(@__DIR__)
-        cmd = `$(Base.julia_cmd()) --project=$project_root -m FITSexplore -- --help`
+        # `-m Module` entry-point support was added in Julia 1.11; use -e on older versions.
+        cmd = if VERSION >= v"1.11"
+            `$(Base.julia_cmd()) --project=$project_root -m FITSexplore -- --help`
+        else
+            `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--help\"])"`
+        end
         @test success(pipeline(cmd, stdout=devnull, stderr=devnull))
     end
 end
