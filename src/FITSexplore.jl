@@ -525,6 +525,7 @@ end
                         main(["-k", "NAXIS", "-K", "OBJECT", sample_file])
                         main(["-f", "NAXIS", "2", sample_file])
                     end
+                    display(heatmap(rand(10, 10)))
                     parse_keywords(String[], ["NAXIS"], String[])
                     parse_filter(String[], ["NAXIS", "2"])
                     comparekeys(2, "2")
