@@ -7,7 +7,7 @@ using FITSexplore
     fits_path = joinpath(tmpdir, "sample.fits")
 
     # Build a minimal FITS file with one image HDU.
-    writefits!(fits_path, FitsHeader(), reshape(collect(1:4), 2, 2); overwrite=true)
+    writefits!(fits_path, FitsHeader(), reshape(collect(1:4), 2, 2); overwrite = true)
 
     @testset "--hdu prints selected headers" begin
         @test_nowarn FITSexplore.main(["--hdu", "1", fits_path])
@@ -25,30 +25,30 @@ using FITSexplore
     @testset "stats CLI branches" begin
         project_root = dirname(@__DIR__)
         stats_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"$fits_path\"])"`
-        @test success(pipeline(stats_cmd, stdout=devnull, stderr=devnull))
+        @test success(pipeline(stats_cmd, stdout = devnull, stderr = devnull))
 
         stats_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"--hdu\", \"1\", \"$fits_path\"])"`
-        @test success(pipeline(stats_hdu_cmd, stdout=devnull, stderr=devnull))
+        @test success(pipeline(stats_hdu_cmd, stdout = devnull, stderr = devnull))
     end
 
     @testset "plot CLI branches" begin
         project_root = dirname(@__DIR__)
         plot_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"$fits_path\"])"`
-        @test success(pipeline(plot_cmd, stdout=devnull, stderr=devnull))
+        @test success(pipeline(plot_cmd, stdout = devnull, stderr = devnull))
 
         plot_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--plot\", \"--hdu\", \"1\", \"$fits_path\"])"`
-        @test success(pipeline(plot_hdu_cmd, stdout=devnull, stderr=devnull))
+        @test success(pipeline(plot_hdu_cmd, stdout = devnull, stderr = devnull))
     end
 
     @testset "keyword and filter outputs" begin
         project_root = dirname(@__DIR__)
         kw_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"$fits_path\"])"`
-        kw_out = read(pipeline(kw_cmd, stderr=devnull), String)
+        kw_out = read(pipeline(kw_cmd, stderr = devnull), String)
         @test occursin(fits_path, kw_out)
         @test occursin("2", kw_out)
 
         filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$fits_path\"])"`
-        filter_out = read(pipeline(filter_cmd, stderr=devnull), String)
+        filter_out = read(pipeline(filter_cmd, stderr = devnull), String)
         @test occursin(fits_path, filter_out)
     end
 
@@ -71,11 +71,11 @@ using FITSexplore
         @test haskey(exact_filtered, fits_path)
 
         dict_copy = copy(headers)
-        FITSexplore.filter_keywords(dict_copy, Dict{String,Any}("NAXIS" => 2))
+        FITSexplore.filter_keywords(dict_copy, Dict{String, Any}("NAXIS" => 2))
         @test haskey(dict_copy, fits_path)
 
         dict_copy2 = copy(headers)
-        FITSexplore.filter_keywords(dict_copy2, Dict{String,Any}("NAXIS" => 3))
+        FITSexplore.filter_keywords(dict_copy2, Dict{String, Any}("NAXIS" => 3))
         @test !haskey(dict_copy2, fits_path)
     end
 
@@ -87,6 +87,6 @@ using FITSexplore
         else
             `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--help\"])"`
         end
-        @test success(pipeline(cmd, stdout=devnull, stderr=devnull))
+        @test success(pipeline(cmd, stdout = devnull, stderr = devnull))
     end
 end
