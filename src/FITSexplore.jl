@@ -506,6 +506,7 @@ function main(args = ARGS)
 end
 
 @setup_workload begin
+    sample_file = joinpath(@__DIR__, "..", "samples", "sample.fits")
     keyword_args = ["-k", "NAXIS", "dummy.fits"]
     keyword_optional_args = ["-k", "NAXIS", "-K", "OBJECT", "dummy.fits"]
     filter_args = ["-f", "NAXIS", "2", "dummy.fits"]
@@ -514,6 +515,14 @@ end
             main(keyword_args)
             main(keyword_optional_args)
             main(filter_args)
+            if isfile(sample_file)
+                main([sample_file])
+                main(["-d", sample_file])
+                main(["-u", "1", sample_file])
+                main(["-k", "NAXIS", sample_file])
+                main(["-k", "NAXIS", "-K", "OBJECT", sample_file])
+                main(["-f", "NAXIS", "2", sample_file])
+            end
             parse_keywords(String[], ["NAXIS"], String[])
             parse_filter(String[], ["NAXIS", "2"])
             comparekeys(2, "2")
