@@ -47,6 +47,16 @@ using FITSexplore
         @test occursin(fits_path, kw_out)
         @test occursin("2", kw_out)
 
+        # Default keyword behavior: missing required keyword suppresses output.
+        kw_missing_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
+        kw_missing_out = read(pipeline(kw_missing_cmd, stderr = devnull), String)
+        @test isempty(strip(kw_missing_out))
+
+        # If a required keyword is missing, optional keywords should not force output.
+        kw_missing_with_optional_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"DOES_NOT_EXIST\", \"--keyword-optional\", \"NAXIS\", \"$fits_path\"])"`
+        kw_missing_with_optional_out = read(pipeline(kw_missing_with_optional_cmd, stderr = devnull), String)
+        @test isempty(strip(kw_missing_with_optional_out))
+
         kw_optional_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"--keyword-optional\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
         kw_optional_out = read(pipeline(kw_optional_cmd, stderr = devnull), String)
         @test occursin(fits_path, kw_optional_out)
