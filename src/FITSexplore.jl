@@ -359,6 +359,7 @@ function show_header_mode(filename::String, hdu_indices::Vector{Int})
         hdr = try_read_header(filename, index)
         !isnothing(hdr) && show_plain(hdr)
     end
+    return
 end
 
 function print_hdu_stats(filename::String, hdu)
@@ -366,12 +367,12 @@ function print_hdu_stats(filename::String, hdu)
     size(hdu) == () && return
     println(filename, "  hdu :", name(hdu))
     print_stats(read(hdu))
-    println()
+    return println()
 end
 
 function show_stats_mode(filename::String, hdu_indices::Vector{Int})
     f = openfits(filename)
-    try
+    return try
         if isempty(hdu_indices)
             for hdu in f
                 print_hdu_stats(filename, hdu)
@@ -388,7 +389,7 @@ end
 
 function show_file_mode(filename::String)
     f = openfits(filename)
-    try
+    return try
         show_plain(f)
     finally
         close(f)
@@ -396,7 +397,7 @@ function show_file_mode(filename::String)
 end
 
 function process_file_mode(filename::String, head::Bool, stats::Bool, hdu_indices::Vector{Int})
-    if head
+    return if head
         show_header_mode(filename, hdu_indices)
     elseif stats
         show_stats_mode(filename, hdu_indices)
