@@ -18,4 +18,10 @@ using FITSexplore
     @testset "numeric filter rejects invalid values safely" begin
         @test_nowarn FITSexplore.main(["--filter", "NAXIS", "abc", fits_path])
     end
+
+    @testset "App entrypoint" begin
+        project_root = dirname(@__DIR__)
+        cmd = `$(Base.julia_cmd()) --project=$project_root -m FITSexplore -- --help`
+        @test success(pipeline(cmd, stdout=devnull, stderr=devnull))
+    end
 end
