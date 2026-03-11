@@ -238,6 +238,7 @@ end
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
 
+@isdefined(var"@main") ? (@main) : exit(main(ARGS)) 
 
 function (@main)(args)
 	
