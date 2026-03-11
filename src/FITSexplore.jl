@@ -238,9 +238,8 @@ end
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
 
-@isdefined(var"@main") ? (@main) : exit(main(ARGS)) 
 
-function (@main)(args)
+function main(args = ARGS)
 	
 	settings = ArgParseSettings(prog = "FITSexplore",
 	#version = @project_version,
@@ -384,6 +383,14 @@ function (@main)(args)
 		end
 	end
 
+end
+
+# Register main as the app entry point for `julia -m FITSexplore` on Julia >= 1.11.
+# `@main` (no-arg form) marks the module's `main` as the entry point.
+# `include_string` is used so this file parses correctly on Julia < 1.11,
+# where the `@main` macro does not exist.
+if isdefined(Base, Symbol("@main"))
+    include_string(@__MODULE__, "@main")
 end
 
 end
