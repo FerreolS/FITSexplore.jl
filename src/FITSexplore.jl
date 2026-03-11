@@ -40,7 +40,8 @@ function try_read_header(filename::AbstractString)
     try
         return read_header(filename)
     catch err
-        @warn "cannot read FITS header, skipping file" filename exception = (err, catch_backtrace())
+        reason = sprint(showerror, err)
+        println(stderr, "Warning: cannot read FITS header, skipping file: ", filename, " (", reason, ")")
         return nothing
     end
 end
@@ -49,9 +50,51 @@ function try_read_header(filename::AbstractString, index::Integer)
     try
         return read_header(filename, index)
     catch err
-        @warn "cannot read FITS header, skipping file/HDU" filename index exception = (err, catch_backtrace())
+        reason = sprint(showerror, err)
+        println(stderr, "Warning: cannot read FITS header, skipping file/HDU: ", filename, " [hdu=", index, "] (", reason, ")")
         return nothing
     end
+end
+
+"""
+A thin header-like wrapper around a `Dict{String,Any}` built by reading
+individual keywords directly via CFITSIO (bypassing `FITSHeaders.Parser`).
+Supports the same `haskey` / `header_value` interface as `FitsHeader`.
+"""
+struct LightHeader
+    data::Dict{String, Any}
+end
+Base.haskey(h::LightHeader, key::AbstractString) = haskey(h.data, key)
+header_value(h::LightHeader, key::AbstractString) = h.data[key]
+
+"""
+try_read_keywords_direct(filename, keywords)
+
+Fallback for files whose full header cannot be parsed by `FITSHeaders`.
+Opens the file via CFITSIO (`openfits`) and reads only the requested
+`keywords` one at a time using `get(hdu, key, nothing)`, which never
+touches invalid/non-standard cards.
+Returns a `LightHeader` on success, `nothing` on failure.
+"""
+function try_read_keywords_direct(filename::AbstractString, keywords)
+    data = Dict{String, Any}()
+    try
+        f = openfits(filename)
+        try
+            hdu = f[1]
+            for key in keywords
+                card = get(hdu, key, nothing)
+                card !== nothing && (data[key] = card.value())
+            end
+        finally
+            close(f)
+        end
+    catch ex
+        reason = sprint(showerror, ex)
+        println(stderr, "Warning: cannot read FITS keywords directly, skipping file: ", filename, " (", reason, ")")
+        return nothing
+    end
+    return LightHeader(data)
 end
 
 """
@@ -140,6 +183,9 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywords
         if isfile(filename)
             if has_suffix(filename, suffixes)
                 header = try_read_header(filename)
+                if isnothing(header)
+                    header = try_read_keywords_direct(filename, vcat(keywords, keywordsoptional))
+                end
                 isnothing(header) && continue
                 values = String[]
                 isrequired = true
@@ -186,6 +232,9 @@ function parse_keywords(args::Vector{String}, keywords::Set{String})
     for filename in args
         if isfile(filename) && has_suffix(filename, suffixes)
             header = try_read_header(filename)
+            if isnothing(header)
+                header = try_read_keywords_direct(filename, collect(keywords))
+            end
             isnothing(header) && continue
             if all(keyword in keys(header) for keyword in keywords)
                 str = join([header_value(header, key) for key in keywords], "\t")
@@ -200,6 +249,9 @@ function parse_filter(args::Vector{String}, filter::Vector{String})
     for filename in args
         if isfile(filename) && has_suffix(filename, suffixes)
             header = try_read_header(filename)
+            if isnothing(header)
+                header = try_read_keywords_direct(filename, [filter[1]])
+            end
             isnothing(header) && continue
             if haskey(header, filter[1])
                 if comparekeys(header_value(header, filter[1]), filter[2])
