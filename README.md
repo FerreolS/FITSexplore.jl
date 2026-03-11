@@ -1,10 +1,20 @@
 # FITSexplore
 
-Simple command line script to explore FITS files content.
+Simple command line tool and Julia package to explore FITS file content.
+
+This package is configured as a Julia App (`[apps]` in `Project.toml`) and can be directly called from command line.
 
 ## Usage
 
-```FITSexplore [-d] [-k KEYWORD] [-f KEYWORD VALUE] [-r] [--version] [-h] [TARGET...]```
+```text
+fitsexplore [-d] [-k KEYWORD] [-f KEYWORD VALUE] [-r] [--version] [-h] [TARGET...]
+```
+
+Alternative module invocation:
+
+```bash
+julia -m FITSexplore -- [options] [TARGET...]
+```
 
 #### Without optional argument
 
@@ -12,7 +22,7 @@ it will display the name and the type of all HDU
 contained in the files `TARGET`. The `TARGET` can contain any files with extension : .fits, .fits.gz, fits.Z, .oifits
 
 ```console
-me@host:~$ FITSexplore GRAVI.fits.Z
+me@host:~$ fitsexplore GRAVI.fits.Z
 FITS(filename) = File: GRAVI.fits.Z
 Mode: "r" (read-only)
 HDUs: Num  Name                  Type
@@ -36,7 +46,7 @@ Recursively explores entire directories given by TARGET. If no TARGET is given i
 Display the FITS header of the `TARGET`
 
 ```console
-me@host:~$ FITSexplore -d file.fits
+me@host:~$ fitsexplore -d file.fits
 read(FitsHeader, filename) = SIMPLE  =                    T / file does conform to FITS standard
 BITPIX  =                  -32 / number of bits per data pixel
 NAXIS   =                    2 / Dimensionality
@@ -58,7 +68,7 @@ HDUNAME = 'IMAGE-OI FINAL IMAGE' / Unique name for the image within the FITS fil
 Display some statistical properties of the first hdu of the  `TARGET`
 
 ```console
-me@host:~$ FITSexplore -s file.fits
+me@host:~$ fitsexplore -s file.fits
 size 	 	 type 		minimum	maximum	mean	std	median	mad
 (1156, 1024, 20)	UInt16	966.0	31844.0	11440.0019	10963.8464	1984.0	1472.224
 ```
@@ -70,7 +80,7 @@ Print the value of the FITS header `KEYWORD`.
 This argument can be set multiple times to display several FITS keywords.
 
 ```console
-me@host:~$ FITSexplore -k "ESO DPR TYPE" -k "ESO DET2 SEQ1 DIT" -k  "ESO DET2 NDIT" -r /path/to/folder
+me@host:~$ fitsexplore -k "ESO DPR TYPE" -k "ESO DET2 SEQ1 DIT" -k  "ESO DET2 NDIT" -r /path/to/folder
 /path/to/folder/file1.fits.Z             STD,SINGLE      3.0     120
 /path/to/folder/file2.fits.Z             STD,SINGLE      3.0     120
 /path/to/folder/file3.fits.Z             SKY,SINGLE      3.0     120
@@ -86,7 +96,7 @@ me@host:~$ FITSexplore -k "ESO DPR TYPE" -k "ESO DET2 SEQ1 DIT" -k  "ESO DET2 ND
 Print all files where the FITS header `KEYWORD` = `VALUE`.
 
 ```console
-me@host:~$ FITSexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
+me@host:~$ fitsexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 /path/to/folder/file6.fits.Z
 /path/to/folder/file7.fits.Z
 /path/to/folder/file8.fits.Z
@@ -97,7 +107,7 @@ me@host:~$ FITSexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 Display statistical information about all image HDU: 
 
 ```console
-FITSexplore -s file.fits
+fitsexplore -s file.fits
 file.fits  hdu :SCI
 size     type            mean   std     median  mad
 (640, 640)      Float32         16170.782       10711.193       17808.355       10895.537
@@ -114,27 +124,32 @@ size     type            mean   std     median  mad
 * Adding a keyword value in the filename:
 
 ```console
-me@host:~$ FITSexplore -k "ESO DPR TYPE" | awk  '{system("mv "$1" "$2"_"$1)}'
+me@host:~$ fitsexplore -k "ESO DPR TYPE" | awk  '{system("mv "$1" "$2"_"$1)}'
 ````
 
 * Displaying the size of files of a given type:
 
 ```console
-me@host:~$ ls -lh $(FITSexplore -f "ESO DPR TYPE" "DARK" -r /path/to/folder)
+me@host:~$ ls -lh $(fitsexplore -f "ESO DPR TYPE" "DARK" -r /path/to/folder)
 ````
 
 
 ## Installation
 
-* Install the unregistered Julia package FITSexplore.jl.
+Install the package:
 
 ```julia-pkg
 pkg> add https://github.com/FerreolS/FITSexplore.jl
 ```
 
-* Copy the script `FITSexplore` located in the bin folder to your favorite `bin` folder included in your `PATH` (e.g `$HOME/bin`, `/usr/local/bin`, `~/Applications`). This script can be found in the folder `.julia/packages/FITSexplore`.
-* Make the script executable.
+Install as app to have it in your path:
+
+```julia-pkg
+pkg> app add FITSexplore
+```
+
+Then make sure `~/.julia/bin` is in your `PATH` and run:
 
 ```bash
-chmod +x FITSexplore
+fitsexplore --help
 ```

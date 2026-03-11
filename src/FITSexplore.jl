@@ -1,6 +1,8 @@
 """
 
-Package `FITSexplore`
+`FITSexplore` provides FITS exploration utilities as both:
+- a Julia package (`using FITSexplore`), and
+- a Julia app entrypoint (`julia -m FITSexplore -- ...` or installed `fitsexplore`).
 
 """
 module FITSexplore
