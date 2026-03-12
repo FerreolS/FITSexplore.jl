@@ -42,7 +42,7 @@ jobs:
       - name: Build relocatable bundle
         env:
           JULIAC_ENV: /tmp/juliac-env
-          BUNDLE_DIR: fitsexplore-${{ matrix.target }}
+          BUNDLE_DIR: build-juliac
           EXE_NAME: fitsexplore
           TRIM_MODE: safe
           EXPERIMENTAL: "1"
@@ -51,8 +51,8 @@ jobs:
       - name: Archive bundle
         run: |
           set -euxo pipefail
-          ARCHIVE="fitsexplore.tar.gz"
-          tar -C "${GITHUB_WORKSPACE}" -czf "/tmp/${ARCHIVE}" fitsexplore
+          ARCHIVE="fitsexplore-${{ matrix.target }}.tar.gz"
+          tar -C "${GITHUB_WORKSPACE}" -czf "/tmp/${ARCHIVE}" build-juliac
           mv "/tmp/${ARCHIVE}" "${GITHUB_WORKSPACE}/${ARCHIVE}"
 
       - name: Upload archive artifact
@@ -84,9 +84,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Recreate exe as a fresh orphan branch on every run.
-          git checkout --orphan exe
-          git reset --hard
+          if git ls-remote --exit-code --heads origin exe; then
+            git fetch origin exe
+            git checkout -B exe origin/exe
+          else
+            git checkout --orphan exe
+            git rm -rf . || true
+          fi
 
           # Keep branch contents focused on distributable artefacts.
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
@@ -104,5 +108,5 @@ jobs:
           ls -1 *.tar.gz | sed 's/^/- /' >> README.txt
 
           git add *.tar.gz README.txt
-          git commit -m "Publish executable bundle for ${GITHUB_SHA}"
-          git push --force origin exe:exe
+          git commit -m "Update executable bundle for ${GITHUB_SHA}" || true
+          git push origin exe
