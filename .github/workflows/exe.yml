@@ -12,10 +12,20 @@ permissions:
   contents: write
 
 jobs:
-  build-and-publish:
-    name: Build and publish executable bundle
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.target }} bundle
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: linux-x86_64
+            julia_arch: x64
+          - runner: macos-14
+            target: macos-aarch64
+            julia_arch: aarch64
 
     steps:
       - uses: actions/checkout@v6
@@ -25,7 +35,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: "1.12"
-          arch: x64
+          arch: ${{ matrix.julia_arch }}
 
       - uses: julia-actions/cache@v3
 
@@ -41,12 +51,33 @@ jobs:
       - name: Archive bundle
         run: |
           set -euxo pipefail
-          ARCHIVE="fitsexplore-linux-x86_64-${GITHUB_SHA}.tar.gz"
+          ARCHIVE="fitsexplore-${{ matrix.target }}.tar.gz"
           tar -C "${GITHUB_WORKSPACE}" -czf "/tmp/${ARCHIVE}" build-juliac
-          sha256sum "/tmp/${ARCHIVE}" > "/tmp/${ARCHIVE}.sha256"
-          echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
+          mv "/tmp/${ARCHIVE}" "${GITHUB_WORKSPACE}/${ARCHIVE}"
 
-      - name: Publish tarball to exe branch
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitsexplore-${{ matrix.target }}
+          path: fitsexplore-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: Publish archives to exe branch
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download archive artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: /tmp/exe-archives
+
+      - name: Publish archives to exe branch
         run: |
           set -euxo pipefail
 
@@ -64,8 +95,7 @@ jobs:
           # Keep branch contents focused on distributable artefacts.
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 
-          cp "/tmp/${ARCHIVE}" "./${ARCHIVE}"
-          cp "/tmp/${ARCHIVE}.sha256" "./${ARCHIVE}.sha256"
+          cp /tmp/exe-archives/*/*.tar.gz ./
 
           cat > README.txt <<EOF
           Relocatable FITSexplore executable bundles.
@@ -74,6 +104,9 @@ jobs:
           Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
           EOF
 
-          git add "${ARCHIVE}" "${ARCHIVE}.sha256" README.txt
+          printf '\nAvailable archives:\n' >> README.txt
+          ls -1 *.tar.gz | sed 's/^/- /' >> README.txt
+
+          git add *.tar.gz README.txt
           git commit -m "Update executable bundle for ${GITHUB_SHA}" || true
           git push origin exe
