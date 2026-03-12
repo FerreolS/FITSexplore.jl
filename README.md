@@ -159,20 +159,16 @@ A fully self-contained, relocatable binary bundle can be built with
 [JuliaC](https://github.com/JuliaLang/JuliaC.jl).  The bundle requires no
 Julia installation and can be copied to any path.
 
-**Prerequisites:** Julia ≥ 1.12 and JuliaC installed in a dedicated environment.
-
-```bash
-julia --project=/tmp/juliac-env -e 'using Pkg; Pkg.add("JuliaC")'
-```
+**Prerequisites:** Julia ≥ 1.12.
 
 **Build** (from the repository root):
 
 ```bash
-julia --startup-file=no --project=/tmp/juliac-env \
-  -e 'using JuliaC; JuliaC.main(ARGS)' -- \
-  --output-exe fitsexplore --bundle fitsexplore-bundle \
-  --trim=safe --experimental .
+JULIAC_ENV=/tmp/juliac-env BUNDLE_DIR=fitsexplore-bundle julia make.jl
 ```
+
+`make.jl` bootstraps JuliaC in `JULIAC_ENV` (if needed) and builds with
+`--trim=safe --experimental`.
 
 This produces a `fitsexplore-bundle/` directory with the layout:
 
@@ -198,13 +194,16 @@ The bundle is fully self-contained: all library references are
 distributed to another machine with the same OS/architecture without any
 adjustment.
 
+In CI, `.github/workflows/exe.yml` builds this bundle, creates a `.tar.gz`
+archive, and pushes release artefacts to the `exe` orphan branch.
+
 **Performance** (macOS, Apple Silicon, 20 warm runs via `hyperfine`):
 
 | Binary | `--help` | `sample.fits` |
 |---|---|---|
-| Relocatable bundle (`--trim=safe`) | ~101 ms | ~104 ms |
-| Julia app (`~/.julia/bin/fitsexplore`) | ~4.2 s | ~2.5 s |
-| **Speedup** | **~41×** | **~25×** |
+| Relocatable bundle (`--trim=safe`) | ~72 ms | ~104 ms |
+| Julia app (`~/.julia/bin/fitsexplore`) | ~2.8 s | ~2.5 s |
+| **Speedup** | **~38×** | **~25×** |
 
 [license-url]: ./LICENSE.md
 [license-img]: http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
