@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+project_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+sysimage_path=${FITSEXPLORE_SYSIMAGE:-"$project_root/benchmark/FITSexplore_sysimage.dylib"}
+
+if [ ! -f "$sysimage_path" ]; then
+    echo "Missing sysimage: $sysimage_path" >&2
+    echo "Build it with: julia --startup-file=no --project=$project_root $project_root/benchmark/build_sysimage.jl" >&2
+    exit 1
+fi
+
+exec julia --startup-file=no --project="$project_root" -J "$sysimage_path" -m FITSexplore -- "$@"

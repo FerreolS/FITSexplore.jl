@@ -156,6 +156,28 @@ Then make sure `~/.julia/bin` is in your `PATH` and run:
 fitsexplore --help
 ```
 
+## Sysimage Workflow
+
+To reduce startup time, build a local sysimage for FITSexplore:
+
+```bash
+julia --startup-file=no --project=. benchmark/build_sysimage.jl
+```
+
+Then use the provided wrapper:
+
+```bash
+bin/fitsexplore-sys --header samples/sample.fits
+bin/fitsexplore-sys -k NAXIS samples/sample.fits
+```
+
+If you want to compare startup times directly:
+
+```bash
+julia --project=. benchmark/compare_startup.jl --header samples/sample.fits
+julia --project=. benchmark/compare_startup.jl -k NAXIS samples/sample.fits
+```
+
 [license-url]: ./LICENSE.md
 [license-img]: http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
 [github-ci-img]: https://github.com/FerreolS/FITSexplore.jl/actions/workflows/CI.yml/badge.svg?branch=master
