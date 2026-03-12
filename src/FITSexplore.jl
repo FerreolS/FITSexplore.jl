@@ -12,6 +12,7 @@ export fitsexplore
 using AstroFITS, FITSHeaders, ArgParse, PrecompileTools, StatsBase #, UnicodePlots
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
+const HeaderScalar = Union{String, Bool, Int, Float64}
 
 function julia_main()::Cint
     try
@@ -25,6 +26,38 @@ end
 
 # Compatibility helpers for AstroFITS card/value API.
 header_value(hdr, key::AbstractString) = hdr[key].value()
+
+header_value_string(value::AbstractString)::String = String(value)
+header_value_string(value::Bool)::String = string(value)
+header_value_string(value::Integer)::String = string(value)
+header_value_string(value::AbstractFloat)::String = string(value)
+header_value_string(value)::String = sprint(show, value)
+
+normalize_header_value(value::AbstractString)::String = String(value)
+normalize_header_value(value::Bool)::Bool = value
+normalize_header_value(value::Integer)::Int = Int(value)
+normalize_header_value(value::AbstractFloat)::Float64 = Float64(value)
+normalize_header_value(value)::String = sprint(show, value)
+
+matches_filter_value(value::AbstractString, expected::AbstractString)::Bool = comparekeys(value, expected)
+matches_filter_value(value::Bool, expected::AbstractString)::Bool = comparekeys(value, expected)
+matches_filter_value(value::T, expected::AbstractString) where {T <: Number} = comparekeys(value, expected)
+matches_filter_value(value, expected::AbstractString)::Bool = header_value_string(value) == expected
+
+function push_required_header_value!(values::Vector{String}, header, key::AbstractString)::Bool
+    haskey(header, key) || return false
+    push!(values, header_value_string(header_value(header, key)))
+    return true
+end
+
+function push_optional_header_value!(values::Vector{String}, header, key::AbstractString)
+    if haskey(header, key)
+        push!(values, header_value_string(header_value(header, key)))
+    else
+        push!(values, " ")
+    end
+    return nothing
+end
 
 function read_header(filename::AbstractString)
     # Header-only read path using FITSHeaders.FitsHeader.
@@ -62,7 +95,7 @@ individual keywords directly via CFITSIO (bypassing `FITSHeaders.Parser`).
 Supports the same `haskey` / `header_value` interface as `FitsHeader`.
 """
 struct LightHeader
-    data::Dict{String, Any}
+    data::Dict{String, HeaderScalar}
 end
 Base.haskey(h::LightHeader, key::AbstractString) = haskey(h.data, key)
 header_value(h::LightHeader, key::AbstractString) = h.data[key]
@@ -77,14 +110,14 @@ touches invalid/non-standard cards.
 Returns a `LightHeader` on success, `nothing` on failure.
 """
 function try_read_keywords_direct(filename::AbstractString, keywords)
-    data = Dict{String, Any}()
+    data = Dict{String, HeaderScalar}()
     try
         f = openfits(filename)
         try
             hdu = f[1]
             for key in keywords
                 card = get(hdu, key, nothing)
-                card !== nothing && (data[key] = card.value())
+                card !== nothing && (data[key] = normalize_header_value(card.value()))
             end
         finally
             close(f)
@@ -190,15 +223,13 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywords
                 values = String[]
                 isrequired = true
                 for key in keywords
-                    if haskey(header, key)
-                        push!(values, string(header_value(header, key)))
-                    else
+                    if !push_required_header_value!(values, header, key)
                         isrequired = false
                     end
                 end
                 if isrequired
                     for key in keywordsoptional
-                        push!(values, haskey(header, key) ? string(header_value(header, key)) : " ")
+                        push_optional_header_value!(values, header, key)
                     end
                     println(filename, "\t", join(values, "\t"))
                 end
@@ -254,7 +285,7 @@ function parse_filter(args::Vector{String}, filter::Vector{String})
             end
             isnothing(header) && continue
             if haskey(header, filter[1])
-                if comparekeys(header_value(header, filter[1]), filter[2])
+                if matches_filter_value(header_value(header, filter[1]), filter[2])
                     println(filename)
                 end
             end
@@ -362,12 +393,12 @@ function show_header_mode(filename::String, hdu_indices::Vector{Int})
     return
 end
 
-function print_hdu_stats(filename::String, hdu)
-    isa(hdu, FitsImageHDU) || return
+function print_hdu_stats(filename::String, hdu::FitsImageHDU)
     size(hdu) == () && return
     println(filename, "  hdu :", name(hdu))
     print_stats(read(hdu))
-    return println()
+    println()
+    return nothing
 end
 
 function show_stats_mode(filename::String, hdu_indices::Vector{Int})
@@ -375,11 +406,14 @@ function show_stats_mode(filename::String, hdu_indices::Vector{Int})
     return try
         if isempty(hdu_indices)
             for hdu in f
+                hdu isa FitsImageHDU || continue
                 print_hdu_stats(filename, hdu)
             end
         else
             for index in hdu_indices
-                print_hdu_stats(filename, f[index])
+                hdu = f[index]
+                hdu isa FitsImageHDU || continue
+                print_hdu_stats(filename, hdu)
             end
         end
     finally
@@ -408,10 +442,82 @@ function process_file_mode(filename::String, head::Bool, stats::Bool, hdu_indice
     end
 end
 
+struct CLIOptions
+    targets::Vector{String}
+    recursive::Bool
+    header::Bool
+    stats::Bool
+    hdu::Vector{Int}
+    keyword::Vector{String}
+    keyword_optional::Vector{String}
+    filter::Vector{String}
+end
+
+function normalize_string_list(raw)::Vector{String}
+    if raw isa AbstractVector{<:AbstractString}
+        return String[raw...]
+    elseif raw isa AbstractVector
+        out = String[]
+        for item in raw
+            if item isa AbstractVector
+                append!(out, string.(item))
+            else
+                push!(out, string(item))
+            end
+        end
+        return out
+    else
+        return String[string(raw)]
+    end
+end
+
+function normalize_hdu_list(raw)::Vector{Int}
+    isempty(raw) && return Int[]
+    if raw isa AbstractVector{<:Integer}
+        return Int[raw...]
+    elseif raw isa AbstractVector
+        out = Int[]
+        for item in raw
+            if item isa AbstractVector
+                append!(out, Int[i for i in item])
+            else
+                push!(out, Int(item))
+            end
+        end
+        return out
+    else
+        return Int[Int(raw)]
+    end
+end
+
+as_bool(x)::Bool = x === true
+
+function parse_cli_options(parsed_args::Dict{String, Any})::CLIOptions
+    raw_targets = parsed_args["TARGET"]
+    raw_recursive = parsed_args["recursive"]
+    raw_header = parsed_args["header"]
+    raw_stats = parsed_args["stats"]
+    raw_hdu = parsed_args["hdu"]
+    raw_keyword = parsed_args["keyword"]
+    raw_keyword_optional = parsed_args["keyword-optional"]
+    raw_filter = parsed_args["filter"]
+
+    targets = normalize_string_list(raw_targets)
+    recursive = as_bool(raw_recursive)
+    header = as_bool(raw_header)
+    stats = as_bool(raw_stats)
+    hdu = normalize_hdu_list(raw_hdu)
+    keyword = normalize_string_list(raw_keyword)
+    keyword_optional = normalize_string_list(raw_keyword_optional)
+    filter = normalize_string_list(raw_filter)
+
+    return CLIOptions(targets, recursive, header, stats, hdu, keyword, keyword_optional, filter)
+end
+
 
 function main(args = ARGS)
 
-    settings = ArgParseSettings(
+    settings::ArgParseSettings = ArgParseSettings(
         prog = "FITSexplore",
         #version = @project_version,
         version = "0.2",
@@ -462,13 +568,12 @@ function main(args = ARGS)
         default = ["."]
     end
 
-    parsed_args = parse_args(args, settings)
-
-    args = parsed_args["TARGET"]
+    parsed_args::Dict{String, Any} = parse_args(args, settings)
+    opts::CLIOptions = parse_cli_options(parsed_args)
 
     files = Vector{String}()
-    for arg in args
-        if isdir(arg) && parsed_args["recursive"]
+    for arg in opts.targets
+        if isdir(arg) && opts.recursive
             files = vcat(files, [root * "/" * filename for (root, dirs, TARGET) in walkdir(arg) for filename in TARGET  ])
         else
             files = vcat(files, arg)
@@ -476,14 +581,14 @@ function main(args = ARGS)
     end
 
 
-    head::Bool = parsed_args["header"]
-    stats::Bool = parsed_args["stats"]
-    hdu_indices::Vector{Int} = collect_hdu_indices(parsed_args["hdu"])
+    head::Bool = opts.header
+    stats::Bool = opts.stats
+    hdu_indices::Vector{Int} = opts.hdu
 
-    return if !isempty(parsed_args["keyword"]) || !isempty(parsed_args["keyword-optional"])
-        parse_keywords(files, parsed_args["keyword"], parsed_args["keyword-optional"])
-    elseif !isempty(parsed_args["filter"])
-        parse_filter(files, parsed_args["filter"])
+    return if !isempty(opts.keyword) || !isempty(opts.keyword_optional)
+        parse_keywords(files, opts.keyword, opts.keyword_optional)
+    elseif !isempty(opts.filter)
+        parse_filter(files, opts.filter)
     else
         for filename in files
             (isfile(filename) && has_suffix(filename, suffixes)) || continue
