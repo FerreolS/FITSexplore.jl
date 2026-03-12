@@ -26,6 +26,9 @@ jobs:
           - runner: macos-14
             target: macos-aarch64
             julia_arch: aarch64
+          - runner: macos-13
+            target: macos-x86_64
+            julia_arch: x64
 
     steps:
       - uses: actions/checkout@v6
@@ -52,7 +55,11 @@ jobs:
         run: |
           set -euxo pipefail
           ARCHIVE="fitsexplore-${{ matrix.target }}.tar.gz"
-          tar -C "${GITHUB_WORKSPACE}" -czf "/tmp/${ARCHIVE}" build-juliac
+          STAGE_DIR="/tmp/archive-${{ matrix.target }}"
+          rm -rf "${STAGE_DIR}"
+          mkdir -p "${STAGE_DIR}"
+          cp -R "${GITHUB_WORKSPACE}/build-juliac" "${STAGE_DIR}/fitsexplore"
+          tar -C "${STAGE_DIR}" -czf "/tmp/${ARCHIVE}" fitsexplore
           mv "/tmp/${ARCHIVE}" "${GITHUB_WORKSPACE}/${ARCHIVE}"
 
       - name: Upload archive artifact
@@ -84,13 +91,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git ls-remote --exit-code --heads origin exe; then
-            git fetch origin exe
-            git checkout -B exe origin/exe
-          else
-            git checkout --orphan exe
-            git rm -rf . || true
-          fi
+          # Destroy remote exe branch before publishing a fresh orphan history.
+          git push origin --delete exe || true
+
+          git checkout --orphan exe
+          git reset --hard
 
           # Keep branch contents focused on distributable artefacts.
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
@@ -108,5 +113,5 @@ jobs:
           ls -1 *.tar.gz | sed 's/^/- /' >> README.txt
 
           git add *.tar.gz README.txt
-          git commit -m "Update executable bundle for ${GITHUB_SHA}" || true
-          git push origin exe
+          git commit -m "Publish executable bundle for ${GITHUB_SHA}"
+          git push --force origin exe:exe
