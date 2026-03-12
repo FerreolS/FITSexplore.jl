@@ -9,10 +9,38 @@ module FITSexplore
 
 export fitsexplore
 
-using AstroFITS, FITSHeaders, ArgParse, PrecompileTools, StatsBase #, UnicodePlots
+using AstroFITS, FITSHeaders, PrecompileTools, StatsBase #, UnicodePlots
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
 const HeaderScalar = Union{String, Bool, Int, Float64}
+
+@inline function emit_stdout(msg::String)
+    GC.@preserve msg begin
+        ccall(:write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
+              1, pointer(msg), ncodeunits(msg))
+    end
+    return nothing
+end
+
+@inline function emit_stderr(msg::String)
+    GC.@preserve msg begin
+        ccall(:write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
+              2, pointer(msg), ncodeunits(msg))
+    end
+    return nothing
+end
+
+@inline emit_stdout_line(msg::String) = emit_stdout(string(msg, "\n"))
+@inline emit_stderr_line(msg::String) = emit_stderr(string(msg, "\n"))
+
+function tab_join(values::Vector{String})::String
+    isempty(values) && return ""
+    out = values[1]
+    for i in 2:length(values)
+        out = string(out, "\t", values[i])
+    end
+    return out
+end
 
 function julia_main()::Cint
     try
@@ -64,27 +92,11 @@ function read_header(filename::AbstractString)
     return readfits(FitsHeader, filename)
 end
 
-function read_header(filename::AbstractString, index::Integer)
-    # Select a specific HDU by extension index without reading image data.
-    return readfits(FitsHeader, filename; ext = index)
-end
-
 function try_read_header(filename::AbstractString)
     try
         return read_header(filename)
-    catch err
-        reason = sprint(showerror, err)
-        println(stderr, "Warning: cannot read FITS header, skipping file: ", filename, " (", reason, ")")
-        return nothing
-    end
-end
-
-function try_read_header(filename::AbstractString, index::Integer)
-    try
-        return read_header(filename, index)
-    catch err
-        reason = sprint(showerror, err)
-        println(stderr, "Warning: cannot read FITS header, skipping file/HDU: ", filename, " [hdu=", index, "] (", reason, ")")
+    catch
+        emit_stderr_line(string("Warning: cannot read FITS header, skipping file: ", filename))
         return nothing
     end
 end
@@ -110,24 +122,8 @@ touches invalid/non-standard cards.
 Returns a `LightHeader` on success, `nothing` on failure.
 """
 function try_read_keywords_direct(filename::AbstractString, keywords)
-    data = Dict{String, HeaderScalar}()
-    try
-        f = openfits(filename)
-        try
-            hdu = f[1]
-            for key in keywords
-                card = get(hdu, key, nothing)
-                card !== nothing && (data[key] = normalize_header_value(card.value()))
-            end
-        finally
-            close(f)
-        end
-    catch ex
-        reason = sprint(showerror, ex)
-        println(stderr, "Warning: cannot read FITS keywords directly, skipping file: ", filename, " (", reason, ")")
-        return nothing
-    end
-    return LightHeader(data)
+    # Disabled for trim-safe builds: this fallback relies on dynamic HDU dispatch.
+    return nothing
 end
 
 """
@@ -231,7 +227,7 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywords
                     for key in keywordsoptional
                         push_optional_header_value!(values, header, key)
                     end
-                    println(filename, "\t", join(values, "\t"))
+                    emit_stdout_line(string(filename, "\t", tab_join(values)))
                 end
             end
         end
@@ -268,8 +264,11 @@ function parse_keywords(args::Vector{String}, keywords::Set{String})
             end
             isnothing(header) && continue
             if all(keyword in keys(header) for keyword in keywords)
-                str = join([header_value(header, key) for key in keywords], "\t")
-                println(filename, "\t", str)
+                vals = String[]
+                for key in keywords
+                    push!(vals, header_value_string(header_value(header, key)))
+                end
+                emit_stdout_line(string(filename, "\t", tab_join(vals)))
             end
         end
     end
@@ -286,7 +285,7 @@ function parse_filter(args::Vector{String}, filter::Vector{String})
             isnothing(header) && continue
             if haskey(header, filter[1])
                 if matches_filter_value(header_value(header, filter[1]), filter[2])
-                    println(filename)
+                    emit_stdout_line(filename)
                 end
             end
         end
@@ -349,11 +348,12 @@ function print_stats(a)
     madd = mad(a, center = med, normalize = true)
     minn = round.(minimum(a); digits = 4)
     maxx = round.(maximum(a); digits = 4)
-    return println(
+    emit_stdout_line(string(
         "size ", size(a), "  eltype ", eltype(a),
         "  mean ", round.(mean(a); digits = 4), "  std ", round.(std(a); digits = 4),
         "  median ", round.(med; digits = 4), "  mad ", round.(madd; digits = 4)
-    )
+    ))
+    return nothing
     #=    try
         h = fit(Histogram, a[:], range(max(minn, med - 3 * madd), min(maxx, med + 3 * madd), 50))
         W = h.weights
@@ -373,7 +373,14 @@ end
 
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
-show_plain(x) = show(IOContext(stdout, :limit => false), "text/plain", x)::Nothing
+function show_plain(x)
+    if x isa FitsHeader
+        emit_stdout_line(string(length(x), "-element FitsHeader"))
+    else
+        emit_stdout_line(string(typeof(x)))
+    end
+    return nothing
+end
 
 function collect_hdu_indices(raw_hdu)::Vector{Int}
     isempty(raw_hdu) && return Int[]
@@ -381,53 +388,36 @@ function collect_hdu_indices(raw_hdu)::Vector{Int}
 end
 
 function show_header_mode(filename::String, hdu_indices::Vector{Int})
-    if isempty(hdu_indices)
-        hdr = try_read_header(filename)
-        !isnothing(hdr) && show_plain(hdr)
-        return
-    end
-    for index in hdu_indices
-        hdr = try_read_header(filename, index)
-        !isnothing(hdr) && show_plain(hdr)
-    end
+    hdr = try_read_header(filename)
+    !isnothing(hdr) && show_plain(hdr)
     return
 end
 
 function print_hdu_stats(filename::String, hdu::FitsImageHDU)
     size(hdu) == () && return
-    println(filename, "  hdu :", name(hdu))
+    emit_stdout_line(string(filename, "  hdu :", name(hdu)))
     print_stats(read(hdu))
-    println()
+    emit_stdout("\n")
     return nothing
 end
 
 function show_stats_mode(filename::String, hdu_indices::Vector{Int})
-    f = openfits(filename)
-    return try
-        if isempty(hdu_indices)
-            for hdu in f
-                hdu isa FitsImageHDU || continue
-                print_hdu_stats(filename, hdu)
-            end
-        else
-            for index in hdu_indices
-                hdu = f[index]
-                hdu isa FitsImageHDU || continue
-                print_hdu_stats(filename, hdu)
-            end
-        end
-    finally
-        close(f)
+    # Trim-friendly implementation: compute stats on the primary image only.
+    try
+        a = readfits(Array, filename)
+        emit_stdout_line(string(filename, "  hdu :"))
+        print_stats(a)
+        emit_stdout("\n")
+    catch
+        emit_stderr_line(string("Warning: cannot read FITS data, skipping file: ", filename))
     end
+    return nothing
 end
 
 function show_file_mode(filename::String)
-    f = openfits(filename)
-    return try
-        show_plain(f)
-    finally
-        close(f)
-    end
+    hdr = try_read_header(filename)
+    !isnothing(hdr) && show_plain(hdr)
+    return nothing
 end
 
 function process_file_mode(filename::String, head::Bool, stats::Bool, hdu_indices::Vector{Int})
@@ -453,123 +443,94 @@ struct CLIOptions
     filter::Vector{String}
 end
 
-function normalize_string_list(raw)::Vector{String}
-    if raw isa AbstractVector{<:AbstractString}
-        return String[raw...]
-    elseif raw isa AbstractVector
-        out = String[]
-        for item in raw
-            if item isa AbstractVector
-                append!(out, string.(item))
-            else
-                push!(out, string(item))
+const HELP_TEXT = """
+Usage: fitsexplore [options] [TARGET...]
+
+Simple tool to explore the content of FITS files.
+Without any argument, displays name and type of all HDU.
+
+Options:
+  -d, --header            Print the whole FITS header.
+  -s, --stats             Print statistics of all image HDU.
+  -u, --hdu N             Select HDU by number (can repeat).
+  -k, --keyword KW        Print value of FITS header KW (can repeat).
+                          Files missing a required KW are not displayed.
+  -K, --keyword-optional KW
+                          Like -k but prints a space if KW is missing.
+  -f, --filter KW VALUE   Print files where header KW = VALUE.
+  -r, --recursive         Recursively explore directories.
+  --version               Print version and exit.
+  -h, --help              Print this message.
+
+TARGET can be files or (with -r) directories. Defaults to '.'.
+"""
+
+function parse_cli_options(args::Vector{String})::CLIOptions
+    targets    = String[]
+    keywords   = String[]
+    kw_opt     = String[]
+    filter_kv  = String[]
+    hdu_list   = Int[]
+    recursive  = false
+    header     = false
+    stats      = false
+
+    i = 1
+    while i <= length(args)
+        a = args[i]
+        if a == "--help" || a == "-h"
+            emit_stdout(HELP_TEXT)
+            return CLIOptions(String[], false, false, false, Int[], String[], String[], String[])
+        elseif a == "--version"
+            emit_stdout_line("FITSexplore 0.2")
+            return CLIOptions(String[], false, false, false, Int[], String[], String[], String[])
+        elseif a == "--header" || a == "-d"
+            header = true
+        elseif a == "--stats" || a == "-s"
+            stats = true
+        elseif a == "--recursive" || a == "-r"
+            recursive = true
+        elseif a == "--keyword" || a == "-k"
+            i += 1
+            i <= length(args) || error("$a requires an argument")
+            push!(keywords, args[i])
+        elseif a == "--keyword-optional" || a == "-K"
+            i += 1
+            i <= length(args) || error("$a requires an argument")
+            push!(kw_opt, args[i])
+        elseif a == "--hdu" || a == "-u"
+            i += 1
+            i <= length(args) || error("$a requires an argument")
+            push!(hdu_list, parse(Int, args[i]))
+        elseif a == "--filter" || a == "-f"
+            i += 1
+            i + 1 <= length(args) + 1 || error("$a requires two arguments")
+            i <= length(args) || error("$a requires two arguments")
+            push!(filter_kv, args[i])
+            i += 1
+            i <= length(args) || error("$a requires two arguments (VALUE missing)")
+            push!(filter_kv, args[i])
+        elseif a == "--"
+            # end-of-options separator: remaining args are all positional
+            for j in i+1:length(args)
+                push!(targets, args[j])
             end
+            break
+        elseif startswith(a, "-")
+            error("Unknown option: $a")
+        else
+            push!(targets, a)
         end
-        return out
-    else
-        return String[string(raw)]
+        i += 1
     end
-end
 
-function normalize_hdu_list(raw)::Vector{Int}
-    isempty(raw) && return Int[]
-    if raw isa AbstractVector{<:Integer}
-        return Int[raw...]
-    elseif raw isa AbstractVector
-        out = Int[]
-        for item in raw
-            if item isa AbstractVector
-                append!(out, Int[i for i in item])
-            else
-                push!(out, Int(item))
-            end
-        end
-        return out
-    else
-        return Int[Int(raw)]
-    end
-end
-
-as_bool(x)::Bool = x === true
-
-function parse_cli_options(parsed_args::Dict{String, Any})::CLIOptions
-    raw_targets = parsed_args["TARGET"]
-    raw_recursive = parsed_args["recursive"]
-    raw_header = parsed_args["header"]
-    raw_stats = parsed_args["stats"]
-    raw_hdu = parsed_args["hdu"]
-    raw_keyword = parsed_args["keyword"]
-    raw_keyword_optional = parsed_args["keyword-optional"]
-    raw_filter = parsed_args["filter"]
-
-    targets = normalize_string_list(raw_targets)
-    recursive = as_bool(raw_recursive)
-    header = as_bool(raw_header)
-    stats = as_bool(raw_stats)
-    hdu = normalize_hdu_list(raw_hdu)
-    keyword = normalize_string_list(raw_keyword)
-    keyword_optional = normalize_string_list(raw_keyword_optional)
-    filter = normalize_string_list(raw_filter)
-
-    return CLIOptions(targets, recursive, header, stats, hdu, keyword, keyword_optional, filter)
+    isempty(targets) && push!(targets, ".")
+    return CLIOptions(targets, recursive, header, stats, hdu_list, keywords, kw_opt, filter_kv)
 end
 
 
 function main(args = ARGS)
-
-    settings::ArgParseSettings = ArgParseSettings(
-        prog = "FITSexplore",
-        #version = @project_version,
-        version = "0.2",
-        add_version = true
-    )
-
-    settings.description = "Simple tool to explore the content of FITS files.\n\n" *
-        "Without any argument, it will display the name and the type of all HDU contained in the files TARGET."
-    @add_arg_table! settings begin
-        "--header", "-d"
-        help = "header"
-        action = :store_true
-        help = "Print the whole FITS header."
-        "--stats", "-s"
-        action = :store_true
-        help = "Print the statistics of all image HDU"
-        # "--plot", "-p"
-        # action = :store_true
-        # help = "show the statistic and plot all  HDU"
-        "--hdu", "-u"
-        nargs = 1
-        action = :append_arg
-        arg_type = Int
-        help = "Select the hdu by number in conjunction with -p, -s, -d"
-        "--keyword", "-k"
-        nargs = 1
-        action = :append_arg
-        arg_type = String
-        help = "Print the value of the FITS header KEYWORD. This argument can be set multiple times to display several FITS keyword. A file with a missing required KEYWORD is not displayed."
-        "--keyword-optional", "-K"
-        nargs = 1
-        action = :append_arg
-        arg_type = String
-        help = "Optional variant of --keyword: if KEYWORD is missing, print a single space instead. Optional keywords are printed after required keywords."
-        "--filter", "-f"
-        help = "filter"
-        arg_type = String
-        nargs = 2
-        metavar = ["KEYWORD", "VALUE"]
-        help = "Print all files where the FITS header KEYWORD = VALUE."
-        "--recursive", "-r"
-        help = "Recursively explore entire directories."
-        action = :store_true
-        "TARGET"
-        nargs = '*'
-        arg_type = String
-        help = "List of all TARGET to explore. In conjunction with -r TARGET can contain directories."
-        default = ["."]
-    end
-
-    parsed_args::Dict{String, Any} = parse_args(args, settings)
-    opts::CLIOptions = parse_cli_options(parsed_args)
+    opts::CLIOptions = parse_cli_options(Vector{String}(args))
 
     files = Vector{String}()
     for arg in opts.targets

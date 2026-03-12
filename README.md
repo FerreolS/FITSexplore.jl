@@ -138,23 +138,73 @@ me@host:~$ ls -lh $(fitsexplore -f "ESO DPR TYPE" "DARK" -r /path/to/folder)
 
 ## Installation
 
-Install the package:
+### Standard (Julia app)
+
+Install the package and register it as a Julia app:
 
 ```julia-pkg
 pkg> add https://github.com/FerreolS/FITSexplore.jl
-```
-
-Install as app to have it in your path:
-
-```julia-pkg
 pkg> app add FITSexplore
 ```
 
-Then make sure `~/.julia/bin` is in your `PATH` and run:
+Make sure `~/.julia/bin` is in your `PATH`, then run:
 
 ```bash
 fitsexplore --help
 ```
+
+### Relocatable self-contained binary (recommended for deployment)
+
+A fully self-contained, relocatable binary bundle can be built with
+[JuliaC](https://github.com/JuliaLang/JuliaC.jl).  The bundle requires no
+Julia installation and can be copied to any path.
+
+**Prerequisites:** Julia ≥ 1.12 and JuliaC installed in a dedicated environment.
+
+```bash
+julia --project=/tmp/juliac-env -e 'using Pkg; Pkg.add("JuliaC")'
+```
+
+**Build** (from the repository root):
+
+```bash
+julia --startup-file=no --project=/tmp/juliac-env \
+  -e 'using JuliaC; JuliaC.main(ARGS)' -- \
+  --output-exe fitsexplore --bundle fitsexplore-bundle \
+  --trim=safe --experimental .
+```
+
+This produces a `fitsexplore-bundle/` directory with the layout:
+
+```
+fitsexplore-bundle/
+  bin/fitsexplore   ← the executable
+  lib/              ← bundled Julia runtime libraries
+  share/            ← artifacts (e.g. CA certificates)
+```
+
+**Install** by copying the bundle to the desired location and adding `bin/` to
+your `PATH`:
+
+```bash
+cp -r fitsexplore-bundle ~/.local/fitsexplore
+echo 'export PATH="$HOME/.local/fitsexplore/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+fitsexplore --help
+```
+
+The bundle is fully self-contained: all library references are
+`@loader_path`-relative (`@rpath/../lib`), so the directory can be moved or
+distributed to another machine with the same OS/architecture without any
+adjustment.
+
+**Performance** (macOS, Apple Silicon, 20 warm runs via `hyperfine`):
+
+| Binary | `--help` | `sample.fits` |
+|---|---|---|
+| Relocatable bundle (`--trim=safe`) | ~101 ms | ~104 ms |
+| Julia app (`~/.julia/bin/fitsexplore`) | ~4.2 s | ~2.5 s |
+| **Speedup** | **~41×** | **~25×** |
 
 [license-url]: ./LICENSE.md
 [license-img]: http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat

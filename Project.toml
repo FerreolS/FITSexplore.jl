@@ -7,14 +7,12 @@ authors = ["Ferréol Soulez <ferreol.soulez@univ-lyon1.fr>"]
 projects = ["test"]
 
 [deps]
-ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 AstroFITS = "34e54ef0-c5bf-48ab-9e5d-cca51f35ed77"
 FITSHeaders = "8163a04c-c153-4fb1-a498-3402381ec208"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-ArgParse = "1"
 AstroFITS = "1.1.0"
 FITSHeaders = "0.4"
 PrecompileTools = "1"
