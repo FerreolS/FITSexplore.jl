@@ -12,12 +12,16 @@ FITSHeaders = "8163a04c-c153-4fb1-a498-3402381ec208"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
+[sources]
+AstroFITS = {rev = "main", url = "https://github.com/FerreolS/AstroFITS.jl"}
+FITSHeaders = {rev = "main", url = "https://github.com/FerreolS/FITSHeaders.jl"}
+
 [compat]
-AstroFITS = "1.1.0"
+AstroFITS = "1.1"
 FITSHeaders = "0.4"
 PrecompileTools = "1"
 StatsBase = "0.34"
 julia = "1.10"
 
-[apps.fitsexplore]
-myapp = { julia_flags = ["--startup-file=no"] }
+[apps.fitsexplore.myapp]
+julia_flags = ["--startup-file=no"]
