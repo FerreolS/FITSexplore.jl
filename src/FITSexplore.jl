@@ -373,7 +373,7 @@ end
 
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
-show_plain(x) = show(IOContext(stdout, :limit => false), "text/plain", x)
+show_plain(x) = show(IOContext(stdout, :limit => false), "text/plain", x)::Nothing
 
 function collect_hdu_indices(raw_hdu)::Vector{Int}
     isempty(raw_hdu) && return Int[]
@@ -599,7 +599,7 @@ function main(args = ARGS)
 end
 
 @setup_workload begin
-    sample_file = joinpath(@__DIR__, "..", "samples", "sample.fits")
+    sample_file = joinpath(@__DIR__,"samples", "sample.fits")
     keyword_args = ["-k", "NAXIS", "dummy.fits"]
     keyword_optional_args = ["-k", "NAXIS", "-K", "OBJECT", "dummy.fits"]
     filter_args = ["-f", "NAXIS", "2", "dummy.fits"]
