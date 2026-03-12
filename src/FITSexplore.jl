@@ -585,7 +585,7 @@ function main(args = ARGS)
     stats::Bool = opts.stats
     hdu_indices::Vector{Int} = opts.hdu
 
-    return if !isempty(opts.keyword) || !isempty(opts.keyword_optional)
+    if !isempty(opts.keyword) || !isempty(opts.keyword_optional)
         parse_keywords(files, opts.keyword, opts.keyword_optional)
     elseif !isempty(opts.filter)
         parse_filter(files, opts.filter)
@@ -595,6 +595,7 @@ function main(args = ARGS)
             process_file_mode(filename, head, stats, hdu_indices)
         end
     end
+    return 0
 
 end
 
