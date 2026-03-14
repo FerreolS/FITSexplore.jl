@@ -16,16 +16,20 @@ const HeaderScalar = Union{String, Bool, Int, Float64}
 
 @inline function emit_stdout(msg::String)
     GC.@preserve msg begin
-        ccall(:write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
-              1, pointer(msg), ncodeunits(msg))
+        ccall(
+            :write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
+            1, pointer(msg), ncodeunits(msg)
+        )
     end
     return nothing
 end
 
 @inline function emit_stderr(msg::String)
     GC.@preserve msg begin
-        ccall(:write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
-              2, pointer(msg), ncodeunits(msg))
+        ccall(
+            :write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
+            2, pointer(msg), ncodeunits(msg)
+        )
     end
     return nothing
 end
@@ -92,6 +96,11 @@ function read_header(filename::AbstractString)
     return readfits(FitsHeader, filename)
 end
 
+function read_header(filename::AbstractString, ext::Integer)
+    # Header-only read path for a specific HDU extension.
+    return readfits(FitsHeader, filename; ext = Int(ext))
+end
+
 function try_read_header(filename::AbstractString)
     try
         return read_header(filename)
@@ -99,6 +108,31 @@ function try_read_header(filename::AbstractString)
         emit_stderr_line(string("Warning: cannot read FITS header, skipping file: ", filename))
         return nothing
     end
+end
+
+function try_read_header(filename::AbstractString, ext::Integer)
+    ext_i = Int(ext)
+    try
+        return read_header(filename, ext_i)
+    catch
+        emit_stderr_line(
+            string(
+                "Warning: cannot read FITS header for HDU ", ext_i,
+                ", skipping file: ", filename
+            )
+        )
+        return nothing
+    end
+end
+
+function selected_hdus(hdu_indices::Vector{Int})::Vector{Int}
+    isempty(hdu_indices) && return [1]
+    return hdu_indices
+end
+
+function format_filename_hdu(filename::String, hdu::Int, include_hdu::Bool)::String
+    include_hdu || return filename
+    return string(filename, "#", hdu)
 end
 
 """
@@ -207,27 +241,43 @@ function fitsexplore(dir::String)
 end
 
 
-function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywordsoptional::Vector{String})
+function parse_keywords(
+        args::Vector{String},
+        keywords::Vector{String},
+        keywordsoptional::Vector{String},
+        hdu_indices::Vector{Int}
+    )
+    use_selected_hdu = !isempty(hdu_indices)
     for filename in args
         if isfile(filename)
             if has_suffix(filename, suffixes)
-                header = try_read_header(filename)
-                if isnothing(header)
-                    header = try_read_keywords_direct(filename, vcat(keywords, keywordsoptional))
-                end
-                isnothing(header) && continue
-                values = String[]
-                isrequired = true
-                for key in keywords
-                    if !push_required_header_value!(values, header, key)
-                        isrequired = false
+                for hdu in selected_hdus(hdu_indices)
+                    header = try_read_header(filename, hdu)
+                    if isnothing(header) && hdu == 1
+                        header = try_read_keywords_direct(filename, vcat(keywords, keywordsoptional))
                     end
-                end
-                if isrequired
-                    for key in keywordsoptional
-                        push_optional_header_value!(values, header, key)
+                    isnothing(header) && continue
+
+                    values = String[]
+                    isrequired = true
+                    for key in keywords
+                        if !push_required_header_value!(values, header, key)
+                            isrequired = false
+                        end
                     end
-                    emit_stdout_line(string(filename, "\t", tab_join(values)))
+
+                    if isrequired
+                        for key in keywordsoptional
+                            push_optional_header_value!(values, header, key)
+                        end
+                        emit_stdout_line(
+                            string(
+                                format_filename_hdu(filename, hdu, use_selected_hdu),
+                                "\t",
+                                tab_join(values)
+                            )
+                        )
+                    end
                 end
             end
         end
@@ -235,40 +285,55 @@ function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywords
     return
 end
 
+function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywordsoptional::Vector{String})
+    return parse_keywords(args, keywords, keywordsoptional, Int[])
+end
+
 function parse_keywords(args::Vector{String}, keywords::Vector{String})
-    return parse_keywords(args, keywords, String[])
+    return parse_keywords(args, keywords, String[], Int[])
 end
 
 function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}}, keywordsoptional::Vector{Vector{String}})
-    return parse_keywords(args, first.(keywords), first.(keywordsoptional))
+    return parse_keywords(args, first.(keywords), first.(keywordsoptional), Int[])
 end
 
 function parse_keywords(args::Vector{String}, keywords::Vector{String}, keywordsoptional::Vector{Vector{String}})
-    return parse_keywords(args, keywords, first.(keywordsoptional))
+    return parse_keywords(args, keywords, first.(keywordsoptional), Int[])
 end
 
 function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}}, keywordsoptional::Vector{String})
-    return parse_keywords(args, first.(keywords), keywordsoptional)
+    return parse_keywords(args, first.(keywords), keywordsoptional, Int[])
 end
 
 function parse_keywords(args::Vector{String}, keywords::Vector{Vector{String}})
-    return parse_keywords(args, first.(keywords), String[])
+    return parse_keywords(args, first.(keywords), String[], Int[])
 end
 
 function parse_keywords(args::Vector{String}, keywords::Set{String})
+    return parse_keywords(args, collect(keywords), String[], Int[])
+end
+
+function parse_keywords(args::Vector{String}, keywords::Set{String}, hdu_indices::Vector{Int})
+    return parse_keywords(args, collect(keywords), String[], hdu_indices)
+end
+
+function parse_filter(args::Vector{String}, filter::Vector{String}, hdu_indices::Vector{Int})
+    use_selected_hdu = !isempty(hdu_indices)
     for filename in args
-        if isfile(filename) && has_suffix(filename, suffixes)
-            header = try_read_header(filename)
-            if isnothing(header)
-                header = try_read_keywords_direct(filename, collect(keywords))
-            end
-            isnothing(header) && continue
-            if all(keyword in keys(header) for keyword in keywords)
-                vals = String[]
-                for key in keywords
-                    push!(vals, header_value_string(header_value(header, key)))
+        if isfile(filename)
+            if has_suffix(filename, suffixes)
+                for hdu in selected_hdus(hdu_indices)
+                    header = try_read_header(filename, hdu)
+                    if isnothing(header) && hdu == 1
+                        header = try_read_keywords_direct(filename, [filter[1]])
+                    end
+                    isnothing(header) && continue
+                    if haskey(header, filter[1])
+                        if matches_filter_value(header_value(header, filter[1]), filter[2])
+                            emit_stdout_line(format_filename_hdu(filename, hdu, use_selected_hdu))
+                        end
+                    end
                 end
-                emit_stdout_line(string(filename, "\t", tab_join(vals)))
             end
         end
     end
@@ -276,21 +341,7 @@ function parse_keywords(args::Vector{String}, keywords::Set{String})
 end
 
 function parse_filter(args::Vector{String}, filter::Vector{String})
-    for filename in args
-        if isfile(filename) && has_suffix(filename, suffixes)
-            header = try_read_header(filename)
-            if isnothing(header)
-                header = try_read_keywords_direct(filename, [filter[1]])
-            end
-            isnothing(header) && continue
-            if haskey(header, filter[1])
-                if matches_filter_value(header_value(header, filter[1]), filter[2])
-                    emit_stdout_line(filename)
-                end
-            end
-        end
-    end
-    return
+    return parse_filter(args, filter, Int[])
 end
 """
 filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
@@ -348,11 +399,13 @@ function print_stats(a)
     madd = mad(a, center = med, normalize = true)
     minn = round.(minimum(a); digits = 4)
     maxx = round.(maximum(a); digits = 4)
-    emit_stdout_line(string(
-        "size ", size(a), "  eltype ", eltype(a),
-        "  mean ", round.(mean(a); digits = 4), "  std ", round.(std(a); digits = 4),
-        "  median ", round.(med; digits = 4), "  mad ", round.(madd; digits = 4)
-    ))
+    emit_stdout_line(
+        string(
+            "size ", size(a), "  eltype ", eltype(a),
+            "  mean ", round.(mean(a); digits = 4), "  std ", round.(std(a); digits = 4),
+            "  median ", round.(med; digits = 4), "  mad ", round.(madd; digits = 4)
+        )
+    )
     return nothing
     #=    try
         h = fit(Histogram, a[:], range(max(minn, med - 3 * madd), min(maxx, med + 3 * madd), 50))
@@ -388,8 +441,10 @@ function collect_hdu_indices(raw_hdu)::Vector{Int}
 end
 
 function show_header_mode(filename::String, hdu_indices::Vector{Int})
-    hdr = try_read_header(filename)
-    !isnothing(hdr) && show_plain(hdr)
+    for hdu in selected_hdus(hdu_indices)
+        hdr = try_read_header(filename, hdu)
+        !isnothing(hdr) && show_plain(hdr)
+    end
     return
 end
 
@@ -401,15 +456,46 @@ function print_hdu_stats(filename::String, hdu::FitsImageHDU)
     return nothing
 end
 
+function hdu_label(filename::String, hdu_index::Int)::String
+    hdr = try_read_header(filename, hdu_index)
+    if !isnothing(hdr) && haskey(hdr, "EXTNAME")
+        return header_value_string(header_value(hdr, "EXTNAME"))
+    end
+    return string(hdu_index)
+end
+
 function show_stats_mode(filename::String, hdu_indices::Vector{Int})
-    # Trim-friendly implementation: compute stats on the primary image only.
     try
-        a = readfits(Array, filename)
-        emit_stdout_line(string(filename, "  hdu :"))
-        print_stats(a)
-        emit_stdout("\n")
+        FitsFile(filename) do f
+            if isempty(hdu_indices)
+                for i in 1:length(f)
+                    hdu = f[i]
+                    hdu isa FitsImageHDU || continue
+                    size(hdu) == () && continue
+                    hdu_name = name(hdu)
+                    label = isempty(hdu_name) ? string(i) : hdu_name
+                    emit_stdout_line(string(filename, "  hdu :", label))
+                    print_stats(read(hdu))
+                    emit_stdout("\n")
+                end
+            else
+                for i in hdu_indices
+                    hdu = f[i]
+                    if hdu isa FitsImageHDU
+                        size(hdu) == () && continue
+                        hdu_name = name(hdu)
+                        label = isempty(hdu_name) ? string(i) : hdu_name
+                        emit_stdout_line(string(filename, "  hdu :", label))
+                        print_stats(read(hdu))
+                        emit_stdout("\n")
+                    end
+                end
+            end
+        end
     catch
-        emit_stderr_line(string("Warning: cannot read FITS data, skipping file: ", filename))
+        emit_stderr_line(
+            string("Warning: cannot read FITS data, skipping file: ", filename)
+        )
     end
     return nothing
 end
@@ -466,14 +552,14 @@ TARGET can be files or (with -r) directories. Defaults to '.'.
 """
 
 function parse_cli_options(args::Vector{String})::CLIOptions
-    targets    = String[]
-    keywords   = String[]
-    kw_opt     = String[]
-    filter_kv  = String[]
-    hdu_list   = Int[]
-    recursive  = false
-    header     = false
-    stats      = false
+    targets = String[]
+    keywords = String[]
+    kw_opt = String[]
+    filter_kv = String[]
+    hdu_list = Int[]
+    recursive = false
+    header = false
+    stats = false
 
     i = 1
     while i <= length(args)
@@ -512,7 +598,7 @@ function parse_cli_options(args::Vector{String})::CLIOptions
             push!(filter_kv, args[i])
         elseif a == "--"
             # end-of-options separator: remaining args are all positional
-            for j in i+1:length(args)
+            for j in (i + 1):length(args)
                 push!(targets, args[j])
             end
             break
@@ -547,9 +633,9 @@ function main(args = ARGS)
     hdu_indices::Vector{Int} = opts.hdu
 
     if !isempty(opts.keyword) || !isempty(opts.keyword_optional)
-        parse_keywords(files, opts.keyword, opts.keyword_optional)
+        parse_keywords(files, opts.keyword, opts.keyword_optional, hdu_indices)
     elseif !isempty(opts.filter)
-        parse_filter(files, opts.filter)
+        parse_filter(files, opts.filter, hdu_indices)
     else
         for filename in files
             (isfile(filename) && has_suffix(filename, suffixes)) || continue
@@ -561,7 +647,7 @@ function main(args = ARGS)
 end
 
 @setup_workload begin
-    sample_file = joinpath(@__DIR__,"samples", "sample.fits")
+    sample_file = joinpath(@__DIR__, "samples", "sample.fits")
     keyword_args = ["-k", "NAXIS", "dummy.fits"]
     keyword_optional_args = ["-k", "NAXIS", "-K", "OBJECT", "dummy.fits"]
     filter_args = ["-f", "NAXIS", "2", "dummy.fits"]
@@ -576,13 +662,19 @@ end
                         main([sample_file])
                         main(["-d", sample_file])
                         main(["-u", "1", sample_file])
+                        main(["-d", "-u", "1", sample_file])
                         main(["-k", "NAXIS", sample_file])
+                        main(["-k", "NAXIS", "-u", "1", sample_file])
                         main(["-k", "NAXIS", "-K", "OBJECT", sample_file])
                         main(["-f", "NAXIS", "2", sample_file])
+                        main(["-k", "NAXIS", "-K", "OBJECT", "-u", "1", sample_file])
+                        main(["-f", "NAXIS", "2", "-u", "1", sample_file])
+                        main(["-s", sample_file])
+                        main(["-s", "-u", "1", sample_file])
                     end
                     #display(heatmap(rand(10, 10)))
                     parse_keywords(String[], ["NAXIS"], String[])
-                    parse_filter(String[], ["NAXIS", "2"])
+                    parse_filter(String[], ["NAXIS", "2"], Int[])
                     comparekeys(2, "2")
                     comparekeys("A", "A")
                     comparekeys(true, "true")

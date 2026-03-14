@@ -50,6 +50,10 @@ using FITSexplore
         @test occursin(fits_path, kw_out)
         @test occursin("2", kw_out)
 
+        kw_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"--hdu\", \"1\", \"$fits_path\"])"`
+        kw_hdu_out = read(pipeline(kw_hdu_cmd, stderr = devnull), String)
+        @test occursin("$(fits_path)#1", kw_hdu_out)
+
         # Default keyword behavior: missing required keyword suppresses output.
         kw_missing_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
         kw_missing_out = read(pipeline(kw_missing_cmd, stderr = devnull), String)
@@ -74,12 +78,25 @@ using FITSexplore
         filter_out = read(pipeline(filter_cmd, stderr = devnull), String)
         @test occursin(fits_path, filter_out)
 
+        filter_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"--hdu\", \"1\", \"$fits_path\"])"`
+        filter_hdu_out = read(pipeline(filter_hdu_cmd, stderr = devnull), String)
+        @test occursin("$(fits_path)#1", filter_hdu_out)
+
         # Malformed FITS files should be skipped instead of crashing.
         bad_kw_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"$bad_fits_path\"])"`
         @test success(pipeline(bad_kw_cmd, stdout = devnull, stderr = devnull))
 
         bad_filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$bad_fits_path\"])"`
         @test success(pipeline(bad_filter_cmd, stdout = devnull, stderr = devnull))
+    end
+
+    @testset "selected hdu stats output" begin
+        project_root = dirname(@__DIR__)
+        stats_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"--hdu\", \"1\", \"$fits_path\"])"`
+        stats_hdu_out = read(pipeline(stats_hdu_cmd, stderr = devnull), String)
+        @test occursin(fits_path, stats_hdu_out)
+        @test occursin("hdu :1", stats_hdu_out)
+        @test occursin("size (2, 2)", stats_hdu_out)
     end
 
     @testset "helpers coverage" begin
