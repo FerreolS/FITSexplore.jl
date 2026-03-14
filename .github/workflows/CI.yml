@@ -80,7 +80,8 @@ jobs:
         run: test -x "${BUNDLE_DIR}/bin/${EXE_NAME}"
 
       - name: Smoke test bundled executable
-        run: "${BUNDLE_DIR}/bin/${EXE_NAME}" --help
+        run: |
+          "${BUNDLE_DIR}/bin/${EXE_NAME}" --help
 
       - name: Install and uninstall via Julia script subcommands
         run: |
@@ -88,7 +89,7 @@ jobs:
           test -L "${BIN_DIR}/${EXE_NAME}"
           test -x "${INSTALL_ROOT}/bin/${EXE_NAME}"
           julia --color=yes make.jl uninstall
-          test ! -e "${BIN_DIR}/${EXE_NAME}"
+          [ ! -e "${BIN_DIR}/${EXE_NAME}" ]
 
       - name: Clean via Makefile wrapper
         run: |
