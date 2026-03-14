@@ -44,6 +44,57 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: FerreolS/FITSexplore.jl
+
+  cli-bundle:
+    name: CLI bundle workflow
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: write
+      contents: read
+    env:
+      JULIAC_ENV: /tmp/juliac-env-ci
+      BUNDLE_DIR: build-juliac-ci
+      EXE_NAME: fitsexplore
+      TRIM_MODE: safe
+      EXPERIMENTAL: "1"
+      INSTALL_ROOT: /tmp/fitsexplore-install/fitsexplore-bundle
+      BIN_DIR: /tmp/fitsexplore-install/bin
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+          arch: x64
+
+      - uses: julia-actions/cache@v3
+
+      - name: Makefile help target
+        run: make help
+
+      - name: Build bundle via Makefile wrapper
+        run: make build
+
+      - name: Check built executable exists
+        run: test -x "${BUNDLE_DIR}/bin/${EXE_NAME}"
+
+      - name: Smoke test bundled executable
+        run: "${BUNDLE_DIR}/bin/${EXE_NAME}" --help
+
+      - name: Install and uninstall via Julia script subcommands
+        run: |
+          julia --color=yes make.jl install
+          test -L "${BIN_DIR}/${EXE_NAME}"
+          test -x "${INSTALL_ROOT}/bin/${EXE_NAME}"
+          julia --color=yes make.jl uninstall
+          test ! -e "${BIN_DIR}/${EXE_NAME}"
+
+      - name: Clean via Makefile wrapper
+        run: |
+          make clean
+          test ! -d "${BUNDLE_DIR}"
+
   Aqua:
     name: Aqua tests
     runs-on: ubuntu-latest

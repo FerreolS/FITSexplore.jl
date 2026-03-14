@@ -15,32 +15,29 @@ BIN_DIR ?= $(HOME)/.julia/bin
 help:
 	@echo "Targets:"
 	@echo "  make build      Build relocatable binary bundle with JuliaC"
-	@echo "  make install    Copy bundle to $(INSTALL_ROOT) and symlink to $(BIN_DIR)/$(EXE_NAME)"
+	@echo "  make install    Build and install bundle to $(INSTALL_ROOT), symlink in $(BIN_DIR)"
 	@echo "  make uninstall  Remove installed symlink and bundle"
 	@echo "  make clean      Remove local build bundle ($(BUNDLE_DIR))"
 
-build:
+define RUN_MAKEJL
 	JULIAC_ENV='$(JULIAC_ENV)' \
 	BUNDLE_DIR='$(BUNDLE_DIR)' \
 	EXE_NAME='$(EXE_NAME)' \
 	TRIM_MODE='$(TRIM_MODE)' \
 	EXPERIMENTAL='$(EXPERIMENTAL)' \
-	julia make.jl
+	INSTALL_ROOT='$(INSTALL_ROOT)' \
+	BIN_DIR='$(BIN_DIR)' \
+	julia make.jl $(1)
+endef
 
-install: build
-	@mkdir -p '$(dir $(INSTALL_ROOT))'
-	@mkdir -p '$(BIN_DIR)'
-	@rm -rf '$(INSTALL_ROOT)'
-	@cp -R '$(BUNDLE_DIR)' '$(INSTALL_ROOT)'
-	@ln -snf '$(INSTALL_ROOT)/bin/$(EXE_NAME)' '$(BIN_DIR)/$(EXE_NAME)'
-	@echo "Installed $(EXE_NAME) to $(INSTALL_ROOT)"
-	@echo "Symlink: $(BIN_DIR)/$(EXE_NAME) -> $(INSTALL_ROOT)/bin/$(EXE_NAME)"
+build:
+	$(call RUN_MAKEJL,build)
+
+install:
+	$(call RUN_MAKEJL,install)
 
 uninstall:
-	@rm -f '$(BIN_DIR)/$(EXE_NAME)'
-	@rm -rf '$(INSTALL_ROOT)'
-	@echo "Removed $(EXE_NAME) from $(BIN_DIR) and $(INSTALL_ROOT)"
+	$(call RUN_MAKEJL,uninstall)
 
 clean:
-	@rm -rf '$(BUNDLE_DIR)'
-	@echo "Removed $(BUNDLE_DIR)"
+	$(call RUN_MAKEJL,clean)

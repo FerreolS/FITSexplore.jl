@@ -201,12 +201,21 @@ archive, and pushes release artefacts to the `exe` orphan branch.
 
 The repository includes a `Makefile` to build and install the relocatable
 binary under `~/.julia`, with an executable launcher in `~/.julia/bin`.
+The `Makefile` is a thin wrapper around `make.jl` (the Julia script is the
+source of truth for build/install logic).
 
 From the repository root:
 
 ```bash
 make build
 make install
+```
+
+Equivalent direct Julia commands are:
+
+```bash
+julia make.jl build
+julia make.jl install
 ```
 
 After `make install`, you get:
