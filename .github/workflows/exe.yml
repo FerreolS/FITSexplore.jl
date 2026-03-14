@@ -2,10 +2,9 @@ name: Build Relocatable Exe
 
 on:
   push:
-    branches:
-      - master
-    tags:
-      - "*"
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 permissions:
@@ -51,7 +50,7 @@ jobs:
           EXPERIMENTAL: "1"
         run: julia --color=yes make.jl
 
-      - name: Archive bundle
+      - name: Archive CLI bundle
         run: |
           set -euxo pipefail
           ARCHIVE="fitsexplore-${{ matrix.target }}.tar.gz"
@@ -62,11 +61,53 @@ jobs:
           tar -C "${STAGE_DIR}" -czf "/tmp/${ARCHIVE}" fitsexplore
           mv "/tmp/${ARCHIVE}" "${GITHUB_WORKSPACE}/${ARCHIVE}"
 
+      - name: Archive macOS .app bundle
+        if: startsWith(matrix.target, 'macos-')
+        run: |
+          set -euxo pipefail
+          APP_ROOT="${GITHUB_WORKSPACE}/FITSexplore.app/Contents"
+          APP_ARCHIVE="fitsexplore-${{ matrix.target }}.app.tar.gz"
+          APP_VERSION=$(awk -F '"' '/^version = "/ { print $2; exit }' "${GITHUB_WORKSPACE}/Project.toml")
+          APP_VERSION=${APP_VERSION:-0.0.0}
+
+          rm -rf "${GITHUB_WORKSPACE}/FITSexplore.app"
+          mkdir -p "${APP_ROOT}/MacOS" "${APP_ROOT}/Resources"
+
+          cp -R "${GITHUB_WORKSPACE}/build-juliac/lib" "${APP_ROOT}/lib"
+          cp -R "${GITHUB_WORKSPACE}/build-juliac/share" "${APP_ROOT}/share"
+          cp "${GITHUB_WORKSPACE}/build-juliac/bin/fitsexplore" "${APP_ROOT}/MacOS/fitsexplore"
+          chmod +x "${APP_ROOT}/MacOS/fitsexplore"
+
+          cat > "${APP_ROOT}/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key>
+            <string>FITSexplore</string>
+            <key>CFBundleDisplayName</key>
+            <string>FITSexplore</string>
+            <key>CFBundleIdentifier</key>
+            <string>org.ferreols.fitsexplore</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${APP_VERSION}</string>
+            <key>CFBundleVersion</key>
+            <string>${APP_VERSION}</string>
+            <key>CFBundleExecutable</key>
+            <string>fitsexplore</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+          </dict>
+          </plist>
+          EOF
+
+          tar -C "${GITHUB_WORKSPACE}" -czf "${GITHUB_WORKSPACE}/${APP_ARCHIVE}" FITSexplore.app
+
       - name: Upload archive artifact
         uses: actions/upload-artifact@v4
         with:
           name: fitsexplore-${{ matrix.target }}
-          path: fitsexplore-${{ matrix.target }}.tar.gz
+          path: fitsexplore-${{ matrix.target }}*.tar.gz
           if-no-files-found: error
 
   publish:

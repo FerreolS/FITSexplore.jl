@@ -197,6 +197,44 @@ adjustment.
 In CI, `.github/workflows/exe.yml` builds this bundle, creates a `.tar.gz`
 archive, and pushes release artefacts to the `exe` orphan branch.
 
+### Makefile workflow (`~/.julia/bin` launcher)
+
+The repository includes a `Makefile` to build and install the relocatable
+binary under `~/.julia`, with an executable launcher in `~/.julia/bin`.
+
+From the repository root:
+
+```bash
+make build
+make install
+```
+
+After `make install`, you get:
+
+- bundle directory: `~/.julia/bundles/fitsexplore-bundle/`
+- executable symlink: `~/.julia/bin/fitsexplore`
+
+Make sure `~/.julia/bin` is in your `PATH`:
+
+```bash
+echo 'export PATH="$HOME/.julia/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+fitsexplore --help
+```
+
+Optional targets:
+
+```bash
+make uninstall   # remove ~/.julia/bin/fitsexplore and ~/.julia/bundles/fitsexplore-bundle
+make clean       # remove local build directory (default: ./build-juliac)
+```
+
+You can override build/install locations and options:
+
+```bash
+make install BUNDLE_DIR=build-juliac TRIM_MODE=safe INSTALL_ROOT="$HOME/.julia/bundles/fitsexplore-bundle"
+```
+
 **Performance** (macOS, Apple Silicon, 20 warm runs via `hyperfine`):
 
 | Binary | `--help` | `sample.fits` |
