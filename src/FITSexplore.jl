@@ -9,7 +9,8 @@ module FITSexplore
 
 export fitsexplore
 
-using AstroFITS, FITSHeaders, PrecompileTools, Printf #, UnicodePlots
+using AstroFITS, FITSHeaders, PrecompileTools, Printf, Statistics #, UnicodePlots
+
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
 const HeaderScalar = Union{String, Bool, Int, Float64}
@@ -419,7 +420,7 @@ function hdu_label(filename::String, hdu_index::Int)::String
     return string(hdu_index)
 end
 
-function header_int_value(hdr, key::AbstractString)::Union{Int,Nothing}
+function header_int_value(hdr, key::AbstractString)::Union{Int, Nothing}
     haskey(hdr, key) || return nothing
     value = header_value(hdr, key)
     if value isa Integer
@@ -443,7 +444,7 @@ function bitpix_eltype_name(bitpix::Int)::String
     return "Float64"
 end
 
-function stats_line(arr::Array{Float64,N}, dims_text::String, eltype_name::String)::String where {N}
+function stats_line(arr::Array{Float64, N}, dims_text::String, eltype_name::String)::String where {N}
     n = length(arr)
     n == 0 && return "size " * dims_text * "  eltype " * eltype_name
 
@@ -454,18 +455,8 @@ function stats_line(arr::Array{Float64,N}, dims_text::String, eltype_name::Strin
         k += 1
     end
 
-    sumx = 0.0
-    @inbounds for x in vals
-        sumx += x
-    end
-    meanx = sumx / n
-
-    varsum = 0.0
-    @inbounds for x in vals
-        dx = x - meanx
-        varsum += dx * dx
-    end
-    stdx = sqrt(varsum / max(n - 1, 1))
+    meanx = Statistics.mean(vals)
+    stdx = Statistics.std(vals; corrected = true, mean = meanx)
 
     sorted_vals = sort(vals)
     half = n ÷ 2
@@ -479,30 +470,35 @@ function stats_line(arr::Array{Float64,N}, dims_text::String, eltype_name::Strin
     madd = isodd(n) ? sorted_absdev[half + 1] : (sorted_absdev[half] + sorted_absdev[half + 1]) / 2
     madd *= 1.4826
 
+    minx, maxx = extrema(vals)
+
     return "size " * dims_text *
-           "  eltype " * eltype_name *
-           "  mean " * string(round(meanx; digits = 4)) *
-           "  std " * string(round(stdx; digits = 4)) *
-           "  median " * string(round(med; digits = 4)) *
-           "  mad " * string(round(madd; digits = 4))
+        "  eltype " * eltype_name *
+        "  mean " * string(round(meanx; digits = 4)) *
+        "  std " * string(round(stdx; digits = 4)) *
+        "  median " * string(round(med; digits = 4)) *
+        "  mad " * string(round(madd; digits = 4)) *
+        " min " * string(round(minx; digits = 4)) *
+        " max " * string(round(maxx; digits = 4))
+
 end
 
 # Generated function: builds the format string and size() calls for each concrete N at
 # compile time, then reads the array and delegates to stats_line.
 @generated function _stats_line_for_naxis(
-    filename::String, i::Int, eltype_name::String, ::Val{N}
-) where {N}
-    fmt        = N == 1 ? "(%d,)" : "(" * join(fill("%d", N), ", ") * ")"
+        filename::String, i::Int, eltype_name::String, ::Val{N}
+    ) where {N}
+    fmt = N == 1 ? "(%d,)" : "(" * join(fill("%d", N), ", ") * ")"
     size_exprs = [:(size(arr, $k)) for k in 1:N]
-    quote
-        arr = readfits(Array{Float64,$N}, filename; ext = i)
+    return quote
+        arr = readfits(Array{Float64, $N}, filename; ext = i)
         dims_text = Printf.@sprintf($fmt, $(size_exprs...))
         return stats_line(arr, dims_text, eltype_name)
     end
 end
 
 # Explicit Val(k) calls are required so JuliaC trim=safe can trace every specialisation.
-function _dispatch_naxis(filename::String, i::Int, eltype_name::String, naxis::Int)::Union{String,Nothing}
+function _dispatch_naxis(filename::String, i::Int, eltype_name::String, naxis::Int)::Union{String, Nothing}
     naxis == 1 && return _stats_line_for_naxis(filename, i, eltype_name, Val(1))
     naxis == 2 && return _stats_line_for_naxis(filename, i, eltype_name, Val(2))
     naxis == 3 && return _stats_line_for_naxis(filename, i, eltype_name, Val(3))
@@ -515,7 +511,9 @@ end
 
 function show_stats_mode(filename::String, hdu_indices::Vector{Int})
     try
-        hdus = isempty(hdu_indices) ? FitsFile(filename) do f; collect(1:length(f)); end : hdu_indices
+        hdus = isempty(hdu_indices) ? FitsFile(filename) do f
+                collect(1:length(f))
+        end : hdu_indices
         for i in hdus
             hdr = try_read_header(filename, i)
             isnothing(hdr) && continue
