@@ -21,7 +21,7 @@ FITSHeaders = {rev = "main", url = "https://github.com/FerreolS/FITSHeaders.jl"}
 AstroFITS = "1.1"
 FITSHeaders = "0.4"
 PrecompileTools = "1"
-Statistics = "1.11"
+Statistics = "1"
 julia = "1.10"
 
 [apps.fitsexplore.myapp]
