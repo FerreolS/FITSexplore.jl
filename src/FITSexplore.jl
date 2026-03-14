@@ -9,7 +9,7 @@ module FITSexplore
 
 export fitsexplore
 
-using AstroFITS, FITSHeaders, PrecompileTools, StatsBase #, UnicodePlots
+using AstroFITS, FITSHeaders, PrecompileTools, Printf #, UnicodePlots
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
 const HeaderScalar = Union{String, Bool, Int, Float64}
@@ -386,44 +386,6 @@ function comparekeys(key1::T, key2::AbstractString) where {T <: Number}
     return !isnothing(parsed) && key1 == parsed
 end
 
-
-function print_stats(a)
-    # println("size \t \t type \t\tminimum\tmaximum\tmean\tstd\tmedian\tmad")
-    # println(size(a), "\t", eltype(a),"\t",round.(minimum(a); digits=4),"\t",
-    #           round.(maximum(a); digits=4),"\t",round.(mean(a); digits=4),"\t",
-    #           round.(std(a); digits=4),"\t",round.(median(a); digits=4),"\t",
-    #           round.(mad(a); digits=4))
-
-
-    med = median(a)
-    madd = mad(a, center = med, normalize = true)
-    minn = round.(minimum(a); digits = 4)
-    maxx = round.(maximum(a); digits = 4)
-    emit_stdout_line(
-        string(
-            "size ", size(a), "  eltype ", eltype(a),
-            "  mean ", round.(mean(a); digits = 4), "  std ", round.(std(a); digits = 4),
-            "  median ", round.(med; digits = 4), "  mad ", round.(madd; digits = 4)
-        )
-    )
-    return nothing
-    #=    try
-        h = fit(Histogram, a[:], range(max(minn, med - 3 * madd), min(maxx, med + 3 * madd), 50))
-        W = h.weights
-        barsyms = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
-        symidxs = eachindex(barsyms)
-        norm_factor = length(symidxs) / maximum(W)
-        get_sym_idx(x) = isnan(x) ? 1 : clamp(first(symidxs) + floor(Int, norm_factor * x), first(symidxs), last(symidxs))
-        print(minn)
-        print(String(barsyms[get_sym_idx.(W)]))
-        print(maxx)
-    catch e
-        @warn "cannot compute histogram" e
-        return (minn, maxx)
-    end
-    return (max(minn, med - 3 * madd), min(maxx, med + 3 * madd)) =#
-end
-
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
 function show_plain(x)
@@ -448,13 +410,6 @@ function show_header_mode(filename::String, hdu_indices::Vector{Int})
     return
 end
 
-function print_hdu_stats(filename::String, hdu::FitsImageHDU)
-    size(hdu) == () && return
-    emit_stdout_line(string(filename, "  hdu :", name(hdu)))
-    print_stats(read(hdu))
-    emit_stdout("\n")
-    return nothing
-end
 
 function hdu_label(filename::String, hdu_index::Int)::String
     hdr = try_read_header(filename, hdu_index)
@@ -464,38 +419,122 @@ function hdu_label(filename::String, hdu_index::Int)::String
     return string(hdu_index)
 end
 
+function header_int_value(hdr, key::AbstractString)::Union{Int,Nothing}
+    haskey(hdr, key) || return nothing
+    value = header_value(hdr, key)
+    if value isa Integer
+        return Int(value)
+    end
+    parsed = tryparse(Int, header_value_string(value))
+    return parsed
+end
+
+function bitpix_eltype_name(bitpix::Int)::String
+    bitpix == 8 && return "UInt8"
+    bitpix == 10 && return "Int8"
+    bitpix == 20 && return "UInt16"
+    bitpix == 16 && return "Int16"
+    bitpix == 40 && return "UInt32"
+    bitpix == 32 && return "Int32"
+    bitpix == 81 && return "UInt64"
+    bitpix == 64 && return "Int64"
+    bitpix == -32 && return "Float32"
+    bitpix == -64 && return "Float64"
+    return "Float64"
+end
+
+function stats_line(arr::Array{Float64,N}, dims_text::String, eltype_name::String)::String where {N}
+    n = length(arr)
+    n == 0 && return "size " * dims_text * "  eltype " * eltype_name
+
+    vals = Vector{Float64}(undef, n)
+    k = 1
+    @inbounds for x in arr
+        vals[k] = x
+        k += 1
+    end
+
+    sumx = 0.0
+    @inbounds for x in vals
+        sumx += x
+    end
+    meanx = sumx / n
+
+    varsum = 0.0
+    @inbounds for x in vals
+        dx = x - meanx
+        varsum += dx * dx
+    end
+    stdx = sqrt(varsum / max(n - 1, 1))
+
+    sorted_vals = sort(vals)
+    half = n ÷ 2
+    med = isodd(n) ? sorted_vals[half + 1] : (sorted_vals[half] + sorted_vals[half + 1]) / 2
+
+    absdev = Vector{Float64}(undef, n)
+    @inbounds for j in 1:n
+        absdev[j] = abs(vals[j] - med)
+    end
+    sorted_absdev = sort(absdev)
+    madd = isodd(n) ? sorted_absdev[half + 1] : (sorted_absdev[half] + sorted_absdev[half + 1]) / 2
+    madd *= 1.4826
+
+    return "size " * dims_text *
+           "  eltype " * eltype_name *
+           "  mean " * string(round(meanx; digits = 4)) *
+           "  std " * string(round(stdx; digits = 4)) *
+           "  median " * string(round(med; digits = 4)) *
+           "  mad " * string(round(madd; digits = 4))
+end
+
+# Generated function: builds the format string and size() calls for each concrete N at
+# compile time, then reads the array and delegates to stats_line.
+@generated function _stats_line_for_naxis(
+    filename::String, i::Int, eltype_name::String, ::Val{N}
+) where {N}
+    fmt        = N == 1 ? "(%d,)" : "(" * join(fill("%d", N), ", ") * ")"
+    size_exprs = [:(size(arr, $k)) for k in 1:N]
+    quote
+        arr = readfits(Array{Float64,$N}, filename; ext = i)
+        dims_text = Printf.@sprintf($fmt, $(size_exprs...))
+        return stats_line(arr, dims_text, eltype_name)
+    end
+end
+
+# Explicit Val(k) calls are required so JuliaC trim=safe can trace every specialisation.
+function _dispatch_naxis(filename::String, i::Int, eltype_name::String, naxis::Int)::Union{String,Nothing}
+    naxis == 1 && return _stats_line_for_naxis(filename, i, eltype_name, Val(1))
+    naxis == 2 && return _stats_line_for_naxis(filename, i, eltype_name, Val(2))
+    naxis == 3 && return _stats_line_for_naxis(filename, i, eltype_name, Val(3))
+    naxis == 4 && return _stats_line_for_naxis(filename, i, eltype_name, Val(4))
+    naxis == 5 && return _stats_line_for_naxis(filename, i, eltype_name, Val(5))
+    naxis == 6 && return _stats_line_for_naxis(filename, i, eltype_name, Val(6))
+    naxis == 7 && return _stats_line_for_naxis(filename, i, eltype_name, Val(7))
+    return nothing
+end
+
 function show_stats_mode(filename::String, hdu_indices::Vector{Int})
     try
-        FitsFile(filename) do f
-            if isempty(hdu_indices)
-                for i in 1:length(f)
-                    hdu = f[i]
-                    hdu isa FitsImageHDU || continue
-                    size(hdu) == () && continue
-                    hdu_name = name(hdu)
-                    label = isempty(hdu_name) ? string(i) : hdu_name
-                    emit_stdout_line(string(filename, "  hdu :", label))
-                    print_stats(read(hdu))
-                    emit_stdout("\n")
-                end
-            else
-                for i in hdu_indices
-                    hdu = f[i]
-                    if hdu isa FitsImageHDU
-                        size(hdu) == () && continue
-                        hdu_name = name(hdu)
-                        label = isempty(hdu_name) ? string(i) : hdu_name
-                        emit_stdout_line(string(filename, "  hdu :", label))
-                        print_stats(read(hdu))
-                        emit_stdout("\n")
-                    end
-                end
+        hdus = isempty(hdu_indices) ? FitsFile(filename) do f; collect(1:length(f)); end : hdu_indices
+        for i in hdus
+            hdr = try_read_header(filename, i)
+            isnothing(hdr) && continue
+            naxis = something(header_int_value(hdr, "NAXIS"), -1)
+            naxis <= 0 && continue
+            eltype_name = bitpix_eltype_name(something(header_int_value(hdr, "BITPIX"), -64))
+
+            emit_stdout_line(string(filename, "  hdu :", hdu_label(filename, i)))
+            line = try
+                _dispatch_naxis(filename, i, eltype_name, naxis)
+            catch
+                continue
             end
+            isnothing(line) && continue
+            emit_stdout_line(line)
+            emit_stdout("\n")
         end
     catch
-        emit_stderr_line(
-            string("Warning: cannot read FITS data, skipping file: ", filename)
-        )
+        emit_stderr_line(string("Warning: cannot read FITS data, skipping file: ", filename))
     end
     return nothing
 end
