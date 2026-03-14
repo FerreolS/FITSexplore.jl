@@ -1,7 +1,6 @@
 name: Build Relocatable Exe
 
 on:
-  push:
   release:
     types:
       - published
