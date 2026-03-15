@@ -390,11 +390,7 @@ end
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
 function show_plain(x)
-    if x isa FitsHeader
-        emit_stdout_line(string(length(x), "-element FitsHeader"))
-    else
-        emit_stdout_line(string(typeof(x)))
-    end
+    emit_stdout_line(sprint(io -> show(io, MIME"text/plain"(), x)))
     return nothing
 end
 
