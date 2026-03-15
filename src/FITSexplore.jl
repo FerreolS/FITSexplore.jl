@@ -106,32 +106,66 @@ Returns `0` on normal completion.
 function main(args = ARGS)
     opts::CLIOptions = parse_cli_options(Vector{String}(args))
 
-    files = Vector{String}()
-    for arg in opts.targets
-        if isdir(arg) && opts.recursive
-            append!(files, [root * "/" * filename for (root, _, target_files) in walkdir(arg) for filename in target_files])
-        else
-            push!(files, arg)
-        end
-    end
-
     list::Bool = opts.list
     head::Bool = opts.header
     stats::Bool = opts.stats
     plot::Bool = opts.plot
     hdu_indices::Vector{Int} = opts.hdu
+    keywords::Vector{String} = opts.keyword
+    kw_opt::Vector{String} = opts.keyword_optional
+    filter::Vector{String} = opts.filter
 
-    if !isempty(opts.keyword) || !isempty(opts.keyword_optional)
-        parse_keywords(files, opts.keyword, opts.keyword_optional, hdu_indices)
-    elseif !isempty(opts.filter)
-        parse_filter(files, opts.filter, hdu_indices)
-    else
-        for filename in files
-            (isfile(filename) && has_suffix(filename, suffixes)) || continue
-            process_file_mode(filename, list, head, stats, plot, hdu_indices)
+    for arg in opts.targets
+        if isdir(arg) && opts.recursive
+            _walk_and_process(arg, keywords, kw_opt, filter, list, head, stats, plot, hdu_indices)
+        else
+            _process_one(arg, keywords, kw_opt, filter, list, head, stats, plot, hdu_indices)
         end
     end
     return 0
+end
+
+function _walk_and_process(
+        root::String,
+        keywords::Vector{String}, kw_opt::Vector{String}, filter::Vector{String},
+        list::Bool, head::Bool, stats::Bool, plot::Bool, hdu_indices::Vector{Int}
+    )
+    # Explicit stack-based traversal — avoids walkdir which uses Channel/Task
+    # and hangs in trim-safe compiled binaries.
+    dirs = String[root]
+    while !isempty(dirs)
+        dir = pop!(dirs)
+        local entries
+        try
+            entries = readdir(dir; join = true)
+        catch
+            continue
+        end
+        for path in entries
+            if isdir(path)
+                push!(dirs, path)
+            elseif has_suffix(path, suffixes)
+                _process_one(path, keywords, kw_opt, filter, list, head, stats, plot, hdu_indices)
+            end
+        end
+    end
+    return nothing
+end
+
+function _process_one(
+        filename::String,
+        keywords::Vector{String}, kw_opt::Vector{String}, filter::Vector{String},
+        list::Bool, head::Bool, stats::Bool, plot::Bool, hdu_indices::Vector{Int}
+    )
+    (isfile(filename) && has_suffix(filename, suffixes)) || return
+    if !isempty(keywords) || !isempty(kw_opt)
+        parse_keywords([filename], keywords, kw_opt, hdu_indices)
+    elseif !isempty(filter)
+        parse_filter([filename], filter, hdu_indices)
+    else
+        process_file_mode(filename, list, head, stats, plot, hdu_indices)
+    end
+    return nothing
 end
 
 
@@ -148,15 +182,19 @@ end
                     main(keyword_optional_args)
                     main(filter_args)
                     if isfile(sample_file)
+                        sample_dir = dirname(sample_file)
                         main([sample_file])
+                        main(["-r", sample_dir])
                         main(["-l", sample_file])
                         main(["-d", sample_file])
                         main(["-u", "1", sample_file])
                         main(["-d", "-u", "1", sample_file])
                         main(["-k", "NAXIS", sample_file])
+                        main(["-k", "NAXIS", "-r", sample_dir])
                         main(["-k", "NAXIS", "-u", "1", sample_file])
                         main(["-k", "NAXIS", "-K", "OBJECT", sample_file])
                         main(["-f", "NAXIS", "2", sample_file])
+                        main(["-f", "NAXIS", "2", "-r", sample_dir])
                         main(["-k", "NAXIS", "-K", "OBJECT", "-u", "1", sample_file])
                         main(["-f", "NAXIS", "2", "-u", "1", sample_file])
                         main(["-s", sample_file])
