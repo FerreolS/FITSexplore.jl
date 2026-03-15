@@ -25,13 +25,17 @@ using FITSexplore
 
         default_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"$fits_path\"])"`
         default_out = read(pipeline(default_cmd, stderr = devnull), String)
-        @test occursin("$(fits_path)#1", default_out)
-        @test occursin("type=PRIMARY", default_out)
+        @test occursin(dirname(fits_path), default_out)
+        @test occursin(basename(fits_path), default_out)
+        @test occursin("EXTNUM\tEXTNAME\tTYPE", default_out)
+        @test occursin("1\t\"\"\tPRIMARY", default_out)
 
         list_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--list\", \"$fits_path\"])"`
         list_out = read(pipeline(list_cmd, stderr = devnull), String)
-        @test occursin("$(fits_path)#1", list_out)
-        @test occursin("type=PRIMARY", list_out)
+        @test occursin(dirname(fits_path), list_out)
+        @test occursin(basename(fits_path), list_out)
+        @test occursin("EXTNUM\tEXTNAME\tTYPE", list_out)
+        @test occursin("1\t\"\"\tPRIMARY", list_out)
 
         @test_nowarn FITSexplore.main(["--header", fits_path])
     end

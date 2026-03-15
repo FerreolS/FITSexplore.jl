@@ -27,10 +27,13 @@ Each output line includes file name, HDU index, and type (plus `EXTNAME` when pr
 
 ```console
 me@host:~$ fitsexplore GRAVI.fits.Z
-GRAVI.fits.Z#1      type=PRIMARY
-GRAVI.fits.Z#2      name=ARRAY_DESCRIPTION   type=BINTABLE
-GRAVI.fits.Z#3      name=ARRAY_GEOMETRY      type=BINTABLE
-GRAVI.fits.Z#4      name=OPTICAL_TRAIN       type=BINTABLE
+.
+  GRAVI.fits.Z
+    EXTNUM  EXTNAME TYPE
+    1       ""      PRIMARY
+    2       "ARRAY_DESCRIPTION" BINTABLE
+    3       "ARRAY_GEOMETRY" BINTABLE
+    4       "OPTICAL_TRAIN" BINTABLE
 ```
 
 #### -l, --list
@@ -39,8 +42,11 @@ Explicitly list HDU (same behavior as default mode).
 
 ```console
 me@host:~$ fitsexplore -l file.fits
-file.fits#1  type=PRIMARY
-file.fits#2  name=SCI type=IMAGE
+.
+  file.fits
+  EXTNUM  EXTNAME TYPE
+  1       ""      PRIMARY
+  2       "SCI"   IMAGE
 ```
 
 #### -r,--recursive

@@ -389,8 +389,17 @@ end
 
 name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
+function show_plain(hdr::FitsHeader)
+    emit_stdout_line(string(length(hdr), "-element ", nameof(typeof(hdr)), ":"))
+    for card in hdr
+        # Keep plain-card formatting while avoiding FitsHeader arrayshow paths in trim-safe builds.
+        emit_stdout_line(sprint(io -> show(io, MIME"text/plain"(), card)))
+    end
+    return nothing
+end
+
 function show_plain(x)
-    emit_stdout_line(sprint(io -> show(io, MIME"text/plain"(), x)))
+    emit_stdout_line(sprint(show, x))
     return nothing
 end
 
@@ -683,20 +692,32 @@ function hdu_name(hdr)::String
 end
 
 function show_list_mode(filename::String, hdu_indices::Vector{Int})
-    selected = isempty(hdu_indices) ? FitsFile(filename) do f
-            collect(1:length(f))
-    end : hdu_indices
+    selected = try
+        isempty(hdu_indices) ? FitsFile(filename) do f
+                collect(1:length(f))
+        end : hdu_indices
+    catch
+        emit_stderr_line(string("Warning: cannot read FITS file, skipping file: ", filename))
+        return nothing
+    end
 
+    hdu_lines = String[]
     for hdu in selected
         hdr = try_read_header(filename, hdu)
         isnothing(hdr) && continue
         typ = hdu_type_name(hdr)
         name = hdu_name(hdr)
-        if isempty(name)
-            emit_stdout_line(string(filename, "#", hdu, "\ttype=", typ))
-        else
-            emit_stdout_line(string(filename, "#", hdu, "\tname=", name, "\ttype=", typ))
-        end
+        quoted_name = string('"', name, '"')
+        push!(hdu_lines, string("        ", hdu, "\t", quoted_name, "\t", typ))
+    end
+
+    isempty(hdu_lines) && return nothing
+
+    emit_stdout_line(dirname(filename))
+    emit_stdout_line(string("    ", basename(filename)))
+    emit_stdout_line("        EXTNUM\tEXTNAME\tTYPE")
+    for line in hdu_lines
+        emit_stdout_line(line)
     end
     return nothing
 end
