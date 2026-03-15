@@ -2,11 +2,29 @@
 
 [![License][license-img]][license-url] [![Build Status][github-ci-img]][github-ci-url] [![Coverage][codecov-img]][codecov-url] [![Aqua QA][aqua-img]][aqua-url]
 
-Simple command line tool and Julia package to explore FITS file content.
+Simple command-line tool and Julia package to explore FITS file content.
 
-This package is configured as a Julia App (`[apps]` in `Project.toml`) and can be directly called from command line.
+## Package API
 
-## Usage
+`FITSexplore` exports 2 functions:
+
+- `fitsexplore(dir::String) -> Dict{String, FitsHeader}` builds a dictionary mapping each supported FITS filename to its primary header.
+- `filter_keyword!(filelist, filters)` filters in place  a file list produced by `fitsexplore`  according to `filters`, a dictionary mapping each keyword to a value or a list of allowed values.
+
+Small example:
+
+```julia
+using FITSexplore
+
+files = fitsexplore(".")
+filter_keyword!(files, Dict("NAXIS" => 2, "EXTNAME" => ["SCI", "PRIMARY"]))
+
+# `files` now contains only entries matching all filters.
+```
+
+## Command line tool
+
+### Usage
 
 ```text
 fitsexplore [-l] [-d] [-s] [-k KEYWORD] [-f KEYWORD VALUE] [-u HDU] [-r] [--version] [-h] [TARGET...]
@@ -115,26 +133,19 @@ me@host:~$ fitsexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 /path/to/folder/file8.fits.Z
 ```
 
-<!--
-#### -p, --plot
-
- Display statistical information and plot all image HDU:
--->
- 
-### Other examples
+### Other Command-line usage examples
 
 * Adding a keyword value in the filename:
 
 ```console
 me@host:~$ fitsexplore -k "ESO DPR TYPE" | awk  '{system("mv "$1" "$2"_"$1)}'
-````
+```
 
 * Displaying the size of files of a given type:
 
 ```console
-me@host:~$ ls -lh $(fitsexplore -f "ESO DPR TYPE" "DARK" -r /path/to/folder)
-````
-
+me@host:~$ ls -lh $(fitsexplore -f "ESO DPR TYPE" "DARK" /path/to/folder)
+```
 
 ## Installation
 
@@ -153,56 +164,18 @@ Make sure `~/.julia/bin` is in your `PATH`, then run:
 fitsexplore --help
 ```
 
-### Relocatable self-contained binary (recommended for deployment)
+### Downloading a self-contained relocatable binary
 
-A fully self-contained, relocatable binary bundle can be built with
-[JuliaC](https://github.com/JuliaLang/JuliaC.jl).  The bundle requires no
-Julia installation and can be copied to any path.
+A `.tar.gz` archive of relocatable binaries of last release are available in  the [`exe` orphan branch](https://github.com/FerreolS/FITSexplore.jl/tree/exe). The bundle requires no Julia installation and can be copied to any path.
+
+### Building a self-contained relocatable binary
+
+The fully self-contained, relocatable binary bundle can be built with [JuliaC](https://github.com/JuliaLang/JuliaC.jl).
 
 **Prerequisites:** Julia ≥ 1.12.
 
-**Build** (from the repository root):
-
-```bash
-JULIAC_ENV=/tmp/juliac-env BUNDLE_DIR=fitsexplore-bundle julia make.jl
-```
-
-`make.jl` bootstraps JuliaC in `JULIAC_ENV` (if needed) and builds with
-`--trim=safe --experimental`.
-
-This produces a `fitsexplore-bundle/` directory with the layout:
-
-```
-fitsexplore-bundle/
-  bin/fitsexplore   ← the executable
-  lib/              ← bundled Julia runtime libraries
-  share/            ← artifacts (e.g. CA certificates)
-```
-
-**Install** by copying the bundle to the desired location and adding `bin/` to
-your `PATH`:
-
-```bash
-cp -r fitsexplore-bundle ~/.local/fitsexplore
-echo 'export PATH="$HOME/.local/fitsexplore/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-fitsexplore --help
-```
-
-The bundle is fully self-contained: all library references are
-`@loader_path`-relative (`@rpath/../lib`), so the directory can be moved or
-distributed to another machine with the same OS/architecture without any
-adjustment.
-
-In CI, `.github/workflows/exe.yml` builds this bundle, creates a `.tar.gz`
-archive, and pushes release artefacts to the `exe` orphan branch.
-
-### Makefile workflow (`~/.julia/bin` launcher)
-
-The repository includes a `Makefile` to build and install the relocatable
-binary under `~/.julia`, with an executable launcher in `~/.julia/bin`.
-The `Makefile` is a thin wrapper around `make.jl` (the Julia script is the
-source of truth for build/install logic).
+**Build** 
+The repository includes a `Makefile` to build the relocatable. Once built the binary can be installed under `~/.julia/bundles`, with an executable launcher in `~/.julia/bin`.
 
 From the repository root:
 
@@ -244,12 +217,12 @@ You can override build/install locations and options:
 make install BUNDLE_DIR=build-juliac TRIM_MODE=safe INSTALL_ROOT="$HOME/.julia/bundles/fitsexplore-bundle"
 ```
 
-**Performance** (macOS, Apple Silicon, 20 warm runs via `hyperfine`):
-
+## Performance
+macOS, Apple Intel, 20 warm runs via `hyperfine`:
 | Binary | `--help` | `sample.fits` |
 |---|---|---|
-| Relocatable bundle (`--trim=safe`) | ~72 ms | ~104 ms |
-| Julia app (`~/.julia/bin/fitsexplore`) | ~2.8 s | ~2.5 s |
+| Relocatable bundle   | ~72 ms | ~104 ms |
+| Julia app  | ~2.8 s | ~2.5 s |
 | **Speedup** | **~38×** | **~25×** |
 
 [license-url]: ./LICENSE.md
