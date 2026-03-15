@@ -13,7 +13,6 @@ using AstroFITS, FITSHeaders, PrecompileTools, Printf, Statistics
 
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
-const HeaderScalar = Union{String, Bool, Int, Float64}
 
 @inline function emit_stdout(msg::String)
     GC.@preserve msg begin
@@ -55,12 +54,6 @@ header_value_string(value::Integer)::String = string(value)
 header_value_string(value::AbstractFloat)::String = string(value)
 header_value_string(value)::String = sprint(show, value)
 
-normalize_header_value(value::AbstractString)::String = String(value)
-normalize_header_value(value::Bool)::Bool = value
-normalize_header_value(value::Integer)::Int = Int(value)
-normalize_header_value(value::AbstractFloat)::Float64 = Float64(value)
-normalize_header_value(value)::String = sprint(show, value)
-
 matches_filter_value(value::AbstractString, expected::AbstractString)::Bool = comparekeys(value, expected)
 matches_filter_value(value::Bool, expected::AbstractString)::Bool = comparekeys(value, expected)
 matches_filter_value(value::T, expected::AbstractString) where {T <: Number} = comparekeys(value, expected)
@@ -99,24 +92,7 @@ function try_read_header(filename::AbstractString)
     end
 end
 
-function try_read_header_silent(filename::AbstractString)
-    try
-        return read_header(filename)
-    catch
-        return nothing
-    end
-end
-
 function try_read_header(filename::AbstractString, ext::Integer)
-    ext_i = Int(ext)
-    try
-        return read_header(filename, ext_i)
-    catch
-        return nothing
-    end
-end
-
-function try_read_header_silent(filename::AbstractString, ext::Integer)
     ext_i = Int(ext)
     try
         return read_header(filename, ext_i)
@@ -177,31 +153,6 @@ function display_path(path::AbstractString)::String
 end
 
 """
-A thin header-like wrapper around a `Dict{String,Any}` built by reading
-individual keywords directly via CFITSIO (bypassing `FITSHeaders.Parser`).
-Supports the same `haskey` / `header_value` interface as `FitsHeader`.
-"""
-struct LightHeader
-    data::Dict{String, HeaderScalar}
-end
-Base.haskey(h::LightHeader, key::AbstractString) = haskey(h.data, key)
-header_value(h::LightHeader, key::AbstractString) = h.data[key]
-
-"""
-try_read_keywords_direct(filename, keywords)
-
-Fallback for files whose full header cannot be parsed by `FITSHeaders`.
-Opens the file via CFITSIO (`openfits`) and reads only the requested
-`keywords` one at a time using `get(hdu, key, nothing)`, which never
-touches invalid/non-standard cards.
-Returns a `LightHeader` on success, `nothing` on failure.
-"""
-function try_read_keywords_direct(filename::AbstractString, keywords)
-    # Disabled for trim-safe builds: this fallback relies on dynamic HDU dispatch.
-    return nothing
-end
-
-"""
 has_suffix(chain, patterns)
 
 Return `true` if `chain` ends with at least one suffix in `patterns`.
@@ -214,59 +165,6 @@ function has_suffix(chain::AbstractString, patterns::AbstractVector{<:AbstractSt
     end
     return false
 end
-
-"""
-newlist = filtercat(filelist,keyword,value)
-
-Build a `newlist` dictionnary of all files where `fitsheader[keyword] == value`.
-"""
-function filtercat(
-        filelist::Dict{String, FitsHeader},
-        keyword::String,
-        values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}
-    )
-    newlist = Dict{String, FitsHeader}()
-    for value in values
-        merge!(newlist, filtercat(filelist, keyword, value))
-    end
-    return newlist
-end
-
-function filtercat(
-        filelist::Dict{String, FitsHeader},
-        keyword::String,
-        value::Union{String, Bool, Integer, AbstractFloat, Nothing}
-    )
-    try
-        tmp = filter(p -> header_value(p.second, keyword) == value, filelist)
-        return tmp
-    catch
-        return Dict{String, FitsHeader}()
-    end
-end
-
-function filtercat2(
-        filelist::Dict{String, FitsHeader},
-        keyword::String,
-        values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}
-    )
-    newlist = Dict{String, FitsHeader}()
-    for (filename, header) in filelist
-        for value in values
-            if haskey(header, keyword) && header_value(header, keyword) == value
-                newlist[filename] = header
-                break
-            end
-        end
-    end
-    return newlist
-end
-
-function filtercat3(filelist::Dict{String, FitsHeader}, keyword::String, values::AbstractVector)
-    filtered = filter(file -> haskey(file[2], keyword) && header_value(file[2], keyword) in values, filelist)
-    return Dict(filtered)
-end
-
 
 function fitsexplore(dir::String)
     filedict = Dict{String, FitsHeader}()
@@ -294,9 +192,6 @@ function parse_keywords(
             if has_suffix(filename, suffixes)
                 for hdu in selected_hdus(hdu_indices)
                     header = try_read_header(filename, hdu)
-                    if isnothing(header) && hdu == 1
-                        header = try_read_keywords_direct(filename, vcat(keywords, keywordsoptional))
-                    end
                     isnothing(header) && continue
 
                     values = String[]
@@ -365,10 +260,7 @@ function parse_filter(args::Vector{String}, filter::Vector{String}, hdu_indices:
         if isfile(filename)
             if has_suffix(filename, suffixes)
                 for hdu in selected_hdus(hdu_indices)
-                    header = try_read_header_silent(filename, hdu)
-                    if isnothing(header) && hdu == 1
-                        header = try_read_keywords_direct(filename, [filter[1]])
-                    end
+                    header = try_read_header(filename, hdu)
                     isnothing(header) && continue
                     if haskey(header, filter[1])
                         if matches_filter_value(header_value(header, filter[1]), filter[2])
@@ -385,37 +277,15 @@ end
 function parse_filter(args::Vector{String}, filter::Vector{String})
     return parse_filter(args, filter, Int[])
 end
-"""
-filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
-
-Filter the files in `filelist` based on the keyword-value pairs in `filter`.
-
-The function modifies `filelist` in place and removes the files that do not meet the filter criteria.
-"""
-function filter_keywords(filelist::Dict{String, FitsHeader}, filter::Dict{String, Any})
-    for (filename, header) in filelist
-        keep = true
-        for (key, value) in filter
-            if !haskey(header, key) || header_value(header, key) != value
-                keep = false
-                break
-            end
-        end
-        if !keep
-            delete!(filelist, filename)
-        end
-    end
-    return
-end
-
 function comparekeys(key1::AbstractString, key2::AbstractString)
     return key1 == key2
 end
 
 function comparekeys(key1::Bool, key2::AbstractString)
-    return if (lowercase(key2) == "true") | (lowercase(key2) == "t") | (key2 == "1")
+    key2_lower = lowercase(key2)
+    return if (key2_lower == "true") || (key2_lower == "t") || (key2 == "1")
         key1
-    elseif (lowercase(key2) == "false") | (lowercase(key2) == "f") | (key2 == "0")
+    elseif (key2_lower == "false") || (key2_lower == "f") || (key2 == "0")
         !key1
     else
         false
@@ -427,8 +297,6 @@ function comparekeys(key1::T, key2::AbstractString) where {T <: Number}
     parsed = tryparse(T, key2)
     return !isnothing(parsed) && key1 == parsed
 end
-
-name(hdu::FitsHDU) = haskey(hdu, "EXTNAME") ? hdu["EXTNAME"].string : ""
 
 function show_plain(hdr::FitsHeader)
     emit_stdout_line(string(length(hdr), "-element ", nameof(typeof(hdr)), ":"))
@@ -442,11 +310,6 @@ end
 function show_plain(x)
     emit_stdout_line(sprint(show, x))
     return nothing
-end
-
-function collect_hdu_indices(raw_hdu)::Vector{Int}
-    isempty(raw_hdu) && return Int[]
-    return Int[i for i in reduce(vcat, raw_hdu)]
 end
 
 function show_header_mode(filename::String, hdu_indices::Vector{Int})
@@ -860,7 +723,6 @@ function parse_cli_options(args::Vector{String})::CLIOptions
             push!(hdu_list, parse(Int, args[i]))
         elseif a == "--filter" || a == "-f"
             i += 1
-            i + 1 <= length(args) + 1 || error("$a requires two arguments")
             i <= length(args) || error("$a requires two arguments")
             push!(filter_kv, args[i])
             i += 1
@@ -891,9 +753,9 @@ function main(args = ARGS)
     files = Vector{String}()
     for arg in opts.targets
         if isdir(arg) && opts.recursive
-            files = vcat(files, [root * "/" * filename for (root, dirs, TARGET) in walkdir(arg) for filename in TARGET  ])
+            append!(files, [root * "/" * filename for (root, _, target_files) in walkdir(arg) for filename in target_files])
         else
-            files = vcat(files, arg)
+            push!(files, arg)
         end
     end
 
