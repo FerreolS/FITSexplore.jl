@@ -9,7 +9,7 @@ module FITSexplore
 
 export fitsexplore
 
-using AstroFITS, FITSHeaders, PrecompileTools, Printf, Statistics #, UnicodePlots
+using AstroFITS, FITSHeaders, PrecompileTools, Printf, Statistics
 
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
@@ -537,17 +537,146 @@ function show_stats_mode(filename::String, hdu_indices::Vector{Int})
     return nothing
 end
 
+function _median_and_mad(vals::Vector{Float64})
+    n = length(vals)
+    n == 0 && return 0.0, 0.0
+    sorted_vals = sort(vals)
+    half = n ÷ 2
+    med = isodd(n) ? sorted_vals[half + 1] : (sorted_vals[half] + sorted_vals[half + 1]) / 2
+
+    absdev = Vector{Float64}(undef, n)
+    @inbounds for i in 1:n
+        absdev[i] = abs(vals[i] - med)
+    end
+    sorted_absdev = sort(absdev)
+    madd = isodd(n) ? sorted_absdev[half + 1] : (sorted_absdev[half] + sorted_absdev[half + 1]) / 2
+    return med, madd * 1.4826
+end
+
+function _plot_matrix(a::Array{Float64, N}) where {N}
+    return if N == 2
+        a
+    elseif N == 3
+        dropdims(Statistics.mean(a; dims = 3); dims = 3)
+    else
+        nothing
+    end
+end
+
+function _downsample_mean(mat::Matrix{Float64}; max_h::Int = 24, max_w::Int = 72)
+    h, w = size(mat)
+    sh = max(1, cld(h, max_h))
+    sw = max(1, cld(w, max_w))
+    oh = cld(h, sh)
+    ow = cld(w, sw)
+    out = Matrix{Float64}(undef, oh, ow)
+    @inbounds for i in 1:oh
+        r1 = (i - 1) * sh + 1
+        r2 = min(i * sh, h)
+        for j in 1:ow
+            c1 = (j - 1) * sw + 1
+            c2 = min(j * sw, w)
+            s = 0.0
+            n = 0
+            for r in r1:r2, c in c1:c2
+                s += mat[r, c]
+                n += 1
+            end
+            out[i, j] = s / max(n, 1)
+        end
+    end
+    return out
+end
+
+function _ascii_heatmap(mat::Matrix{Float64})::String
+    vals = vec(mat)
+    isempty(vals) && return ""
+
+    med, madd = _median_and_mad(Float64.(vals))
+    lo = med - 3 * madd
+    hi = med + 3 * madd
+    if !isfinite(lo) || !isfinite(hi) || lo == hi
+        lo, hi = extrema(vals)
+    end
+    lo == hi && (hi = lo + 1)
+
+    chars = collect(" .:-=+*#%@")
+    nlev = length(chars)
+    io = IOBuffer()
+    h, w = size(mat)
+    @inbounds for i in 1:h
+        for j in 1:w
+            x = clamp((mat[i, j] - lo) / (hi - lo), 0.0, 1.0)
+            idx = Int(floor(x * (nlev - 1))) + 1
+            print(io, chars[idx])
+        end
+        i < h && print(io, '\n')
+    end
+    return String(take!(io))
+end
+
+function plot_image(a::Array{Float64, N}) where {N}
+    mat = _plot_matrix(a)
+    if isnothing(mat)
+        emit_stderr_line(string("Warning: plotting supports NAXIS=2 or 3, got ", N))
+        return nothing
+    end
+    emit_stdout_line(_ascii_heatmap(_downsample_mean(mat)))
+    return nothing
+end
+
+function show_plot_mode(filename::String, hdu_indices::Vector{Int})
+    try
+        hdus = isempty(hdu_indices) ? FitsFile(filename) do f
+                collect(1:length(f))
+        end : hdu_indices
+        for i in hdus
+            hdr = try_read_header(filename, i)
+            isnothing(hdr) && continue
+            naxis = something(header_int_value(hdr, "NAXIS"), -1)
+            naxis <= 0 && continue
+
+            emit_stdout_line(string(filename, "  hdu :", hdu_label(filename, i)))
+
+            if naxis == 2
+                arr = try
+                    readfits(Array{Float64, 2}, filename; ext = i)
+                catch
+                    continue
+                end
+                plot_image(arr)
+            elseif naxis == 3
+                arr = try
+                    readfits(Array{Float64, 3}, filename; ext = i)
+                catch
+                    continue
+                end
+                plot_image(arr)
+            else
+                continue
+            end
+
+            emit_stdout("\n")
+        end
+    catch
+        emit_stderr_line(string("Warning: cannot read FITS data, skipping file: ", filename))
+    end
+    return nothing
+end
+
 function show_file_mode(filename::String)
     hdr = try_read_header(filename)
     !isnothing(hdr) && show_plain(hdr)
     return nothing
 end
 
-function process_file_mode(filename::String, head::Bool, stats::Bool, hdu_indices::Vector{Int})
+function process_file_mode(filename::String, head::Bool, stats::Bool, plot::Bool, hdu_indices::Vector{Int})
     return if head
         show_header_mode(filename, hdu_indices)
     elseif stats
         show_stats_mode(filename, hdu_indices)
+    elseif plot
+        show_plot_mode(filename, hdu_indices)
     elseif !isempty(hdu_indices)
         show_header_mode(filename, hdu_indices)
     else
@@ -560,6 +689,7 @@ struct CLIOptions
     recursive::Bool
     header::Bool
     stats::Bool
+    plot::Bool
     hdu::Vector{Int}
     keyword::Vector{String}
     keyword_optional::Vector{String}
@@ -575,6 +705,7 @@ Without any argument, displays name and type of all HDU.
 Options:
   -d, --header            Print the whole FITS header.
   -s, --stats             Print statistics of all image HDU.
+    -p, --plot              Plot image HDU (NAXIS=2 or 3).
   -u, --hdu N             Select HDU by number (can repeat).
   -k, --keyword KW        Print value of FITS header KW (can repeat).
                           Files missing a required KW are not displayed.
@@ -597,20 +728,23 @@ function parse_cli_options(args::Vector{String})::CLIOptions
     recursive = false
     header = false
     stats = false
+    plot = false
 
     i = 1
     while i <= length(args)
         a = args[i]
         if a == "--help" || a == "-h"
             emit_stdout(HELP_TEXT)
-            return CLIOptions(String[], false, false, false, Int[], String[], String[], String[])
+            return CLIOptions(String[], false, false, false, false, Int[], String[], String[], String[])
         elseif a == "--version"
             emit_stdout_line("FITSexplore 0.2")
-            return CLIOptions(String[], false, false, false, Int[], String[], String[], String[])
+            return CLIOptions(String[], false, false, false, false, Int[], String[], String[], String[])
         elseif a == "--header" || a == "-d"
             header = true
         elseif a == "--stats" || a == "-s"
             stats = true
+        elseif a == "--plot" || a == "-p"
+            plot = true
         elseif a == "--recursive" || a == "-r"
             recursive = true
         elseif a == "--keyword" || a == "-k"
@@ -648,7 +782,7 @@ function parse_cli_options(args::Vector{String})::CLIOptions
     end
 
     isempty(targets) && push!(targets, ".")
-    return CLIOptions(targets, recursive, header, stats, hdu_list, keywords, kw_opt, filter_kv)
+    return CLIOptions(targets, recursive, header, stats, plot, hdu_list, keywords, kw_opt, filter_kv)
 end
 
 
@@ -667,6 +801,7 @@ function main(args = ARGS)
 
     head::Bool = opts.header
     stats::Bool = opts.stats
+    plot::Bool = opts.plot
     hdu_indices::Vector{Int} = opts.hdu
 
     if !isempty(opts.keyword) || !isempty(opts.keyword_optional)
@@ -676,7 +811,7 @@ function main(args = ARGS)
     else
         for filename in files
             (isfile(filename) && has_suffix(filename, suffixes)) || continue
-            process_file_mode(filename, head, stats, hdu_indices)
+            process_file_mode(filename, head, stats, plot, hdu_indices)
         end
     end
     return 0

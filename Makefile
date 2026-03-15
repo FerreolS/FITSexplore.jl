@@ -14,10 +14,11 @@ BIN_DIR ?= $(HOME)/.julia/bin
 
 help:
 	@echo "Targets:"
-	@echo "  make build      Build relocatable binary bundle with JuliaC"
-	@echo "  make install    Build and install bundle to $(INSTALL_ROOT), symlink in $(BIN_DIR)"
-	@echo "  make uninstall  Remove installed symlink and bundle"
-	@echo "  make clean      Remove local build bundle ($(BUNDLE_DIR))"
+	@echo "  make build                    Build relocatable binary bundle with JuliaC"
+	@echo "  make build TRIM_MODE=no       Build with --trim=no (same features, larger binary)"
+	@echo "  make install                  Build and install bundle to $(INSTALL_ROOT), symlink in $(BIN_DIR)"
+	@echo "  make uninstall                Remove installed symlink and bundle"
+	@echo "  make clean                    Remove local build bundle ($(BUNDLE_DIR))"
 
 define RUN_MAKEJL
 	JULIAC_ENV='$(JULIAC_ENV)' \
