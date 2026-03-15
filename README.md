@@ -9,7 +9,7 @@ This package is configured as a Julia App (`[apps]` in `Project.toml`) and can b
 ## Usage
 
 ```text
-fitsexplore [-d] [-k KEYWORD] [-f KEYWORD VALUE] [-r] [--version] [-h] [TARGET...]
+fitsexplore [-l] [-d] [-s] [-k KEYWORD] [-f KEYWORD VALUE] [-u HDU] [-r] [--version] [-h] [TARGET...]
 ```
 
 Alternative module invocation:
@@ -20,22 +20,27 @@ julia -m FITSexplore -- [options] [TARGET...]
 
 #### Without optional argument
 
-it will display the name and the type of all HDU
-contained in the files `TARGET`. The `TARGET` can contain any files with extension : .fits, .fits.gz, fits.Z, .oifits
+By default, `fitsexplore` lists all HDU for each FITS file in `TARGET`.
+Each output line includes file name, HDU index, and type (plus `EXTNAME` when present).
+
+`TARGET` can contain files with extensions `.fits`, `.fits.gz`, `fits.Z`, `.oifits`, `.oifits.gz`, `.oifits.Z`.
 
 ```console
 me@host:~$ fitsexplore GRAVI.fits.Z
-FitsFile("GRAVI.fits.Z")
-HDU  Name                  Type
-      1                          Image
-      2    ARRAY_DESCRIPTION     Table
-      3    ARRAY_GEOMETRY        Table
-      4    OPTICAL_TRAIN         Table
-      5    IMAGING_DATA_ACQ      Image
-      6    IMAGING_DATA_SC       Image
-      7    IMAGING_DETECTOR_SC   Table
-      8    OPDC                  Table
-      9    FDDL                  Table
+GRAVI.fits.Z#1      type=PRIMARY
+GRAVI.fits.Z#2      name=ARRAY_DESCRIPTION   type=BINTABLE
+GRAVI.fits.Z#3      name=ARRAY_GEOMETRY      type=BINTABLE
+GRAVI.fits.Z#4      name=OPTICAL_TRAIN       type=BINTABLE
+```
+
+#### -l, --list
+
+Explicitly list HDU (same behavior as default mode).
+
+```console
+me@host:~$ fitsexplore -l file.fits
+file.fits#1  type=PRIMARY
+file.fits#2  name=SCI type=IMAGE
 ```
 
 #### -r,--recursive
@@ -66,12 +71,13 @@ HDUNAME = 'IMAGE-OI FINAL IMAGE' / unique name for the image within the FITS fil
 ```
 #### -s, --stats
 
-Display some statistical properties of the first hdu of the  `TARGET`
+Display statistical information for image HDU.
+By default all image HDU are shown; use `-u/--hdu` to select specific HDU.
 
 ```console
 me@host:~$ fitsexplore -s file.fits
-size 	 	 type 		minimum	maximum	mean	std	median	mad
-(1156, 1024, 20)	UInt16	966.0	31844.0	11440.0019	10963.8464	1984.0	1472.224
+file.fits  hdu :SCI
+size (640, 640)  eltype Float32  mean 16170.782  std 10711.193  median 17808.355  mad 10895.537 min 0.0 max 65535.0
 ```
 
 
@@ -103,18 +109,6 @@ me@host:~$ fitsexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 /path/to/folder/file8.fits.Z
 ```
 
-#### -s, --stats
-
-Display statistical information about all image HDU: 
-
-```console
-fitsexplore -s file.fits
-file.fits  hdu :SCI
-size     type            mean   std     median  mad
-(640, 640)      Float32         16170.782       10711.193       17808.355       10895.537
- 
- ``` 
- 
 <!--
 #### -p, --plot
 

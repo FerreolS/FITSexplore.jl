@@ -661,20 +661,55 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
 end
 
 function show_file_mode(filename::String)
-    hdr = try_read_header(filename)
-    !isnothing(hdr) && show_plain(hdr)
+    show_list_mode(filename, Int[])
     return nothing
 end
 
-function process_file_mode(filename::String, head::Bool, stats::Bool, plot::Bool, hdu_indices::Vector{Int})
+function hdu_type_name(hdr)::String
+    if haskey(hdr, "XTENSION")
+        return header_value_string(header_value(hdr, "XTENSION"))
+    end
+    if haskey(hdr, "SIMPLE")
+        return "PRIMARY"
+    end
+    return "UNKNOWN"
+end
+
+function hdu_name(hdr)::String
+    if haskey(hdr, "EXTNAME")
+        return header_value_string(header_value(hdr, "EXTNAME"))
+    end
+    return ""
+end
+
+function show_list_mode(filename::String, hdu_indices::Vector{Int})
+    selected = isempty(hdu_indices) ? FitsFile(filename) do f
+            collect(1:length(f))
+    end : hdu_indices
+
+    for hdu in selected
+        hdr = try_read_header(filename, hdu)
+        isnothing(hdr) && continue
+        typ = hdu_type_name(hdr)
+        name = hdu_name(hdr)
+        if isempty(name)
+            emit_stdout_line(string(filename, "#", hdu, "\ttype=", typ))
+        else
+            emit_stdout_line(string(filename, "#", hdu, "\tname=", name, "\ttype=", typ))
+        end
+    end
+    return nothing
+end
+
+function process_file_mode(filename::String, list::Bool, head::Bool, stats::Bool, plot::Bool, hdu_indices::Vector{Int})
     return if head
         show_header_mode(filename, hdu_indices)
     elseif stats
         show_stats_mode(filename, hdu_indices)
     elseif plot
         show_plot_mode(filename, hdu_indices)
-    elseif !isempty(hdu_indices)
-        show_header_mode(filename, hdu_indices)
+    elseif list || !isempty(hdu_indices)
+        show_list_mode(filename, hdu_indices)
     else
         show_file_mode(filename)
     end
@@ -683,6 +718,7 @@ end
 struct CLIOptions
     targets::Vector{String}
     recursive::Bool
+    list::Bool
     header::Bool
     stats::Bool
     plot::Bool
@@ -699,6 +735,7 @@ Simple tool to explore the content of FITS files.
 Without any argument, displays name and type of all HDU.
 
 Options:
+    -l, --list              List all HDU with their name/type.
   -d, --header            Print the whole FITS header.
   -s, --stats             Print statistics of all image HDU.
     -p, --plot              Plot image HDU (NAXIS=2 or 3).
@@ -722,6 +759,7 @@ function parse_cli_options(args::Vector{String})::CLIOptions
     filter_kv = String[]
     hdu_list = Int[]
     recursive = false
+    list = false
     header = false
     stats = false
     plot = false
@@ -731,10 +769,12 @@ function parse_cli_options(args::Vector{String})::CLIOptions
         a = args[i]
         if a == "--help" || a == "-h"
             emit_stdout(HELP_TEXT)
-            return CLIOptions(String[], false, false, false, false, Int[], String[], String[], String[])
+            return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[])
         elseif a == "--version"
             emit_stdout_line("FITSexplore 0.2")
-            return CLIOptions(String[], false, false, false, false, Int[], String[], String[], String[])
+            return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[])
+        elseif a == "--list" || a == "-l"
+            list = true
         elseif a == "--header" || a == "-d"
             header = true
         elseif a == "--stats" || a == "-s"
@@ -778,7 +818,7 @@ function parse_cli_options(args::Vector{String})::CLIOptions
     end
 
     isempty(targets) && push!(targets, ".")
-    return CLIOptions(targets, recursive, header, stats, plot, hdu_list, keywords, kw_opt, filter_kv)
+    return CLIOptions(targets, recursive, list, header, stats, plot, hdu_list, keywords, kw_opt, filter_kv)
 end
 
 
@@ -795,6 +835,7 @@ function main(args = ARGS)
     end
 
 
+    list::Bool = opts.list
     head::Bool = opts.header
     stats::Bool = opts.stats
     plot::Bool = opts.plot
@@ -807,7 +848,7 @@ function main(args = ARGS)
     else
         for filename in files
             (isfile(filename) && has_suffix(filename, suffixes)) || continue
-            process_file_mode(filename, head, stats, plot, hdu_indices)
+            process_file_mode(filename, list, head, stats, plot, hdu_indices)
         end
     end
     return 0
@@ -828,6 +869,7 @@ end
                     main(filter_args)
                     if isfile(sample_file)
                         main([sample_file])
+                        main(["-l", sample_file])
                         main(["-d", sample_file])
                         main(["-u", "1", sample_file])
                         main(["-d", "-u", "1", sample_file])

@@ -21,7 +21,18 @@ using FITSexplore
     end
 
     @testset "default and header CLI branches" begin
-        @test_nowarn FITSexplore.main([fits_path])
+        project_root = dirname(@__DIR__)
+
+        default_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"$fits_path\"])"`
+        default_out = read(pipeline(default_cmd, stderr = devnull), String)
+        @test occursin("$(fits_path)#1", default_out)
+        @test occursin("type=PRIMARY", default_out)
+
+        list_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--list\", \"$fits_path\"])"`
+        list_out = read(pipeline(list_cmd, stderr = devnull), String)
+        @test occursin("$(fits_path)#1", list_out)
+        @test occursin("type=PRIMARY", list_out)
+
         @test_nowarn FITSexplore.main(["--header", fits_path])
     end
 
