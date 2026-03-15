@@ -7,9 +7,8 @@
 """
 module FITSexplore
 
-public fitsexplore,
-    filtercat,
-    filter_keywords
+export fitsexplore,
+    filter_keyword!
 
 using AstroFITS, FITSHeaders, PrecompileTools, Printf, Statistics
 
@@ -40,57 +39,44 @@ function fitsexplore(dir::String)
 end
 
 
-"""
-newlist = filtercat(filelist,keyword,value)
+const ScalarFilterValue = Union{String, Bool, Integer, AbstractFloat, Nothing}
+const VectorFilterValue = Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}
+const FilterValue = Union{ScalarFilterValue, VectorFilterValue}
 
-Build a `newlist` dictionnary of all files where `fitsheader[keyword] == value`.
-"""
-function filtercat(
-        filelist::Dict{String, FitsHeader},
-        keyword::String,
-        values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}
-    )
-    newlist = Dict{String, FitsHeader}()
-    for value in values
-        merge!(newlist, filtercat(filelist, keyword, value))
-    end
-    return newlist
+function _matches_filter_value(actual, expected::ScalarFilterValue)::Bool
+    return actual == expected
 end
 
-function filtercat(
-        filelist::Dict{String, FitsHeader},
-        keyword::String,
-        value::Union{String, Bool, Integer, AbstractFloat, Nothing}
-    )
-    try
-        tmp = filter(p -> header_value(p.second, keyword) == value, filelist)
-        return tmp
-    catch
-        return Dict{String, FitsHeader}()
+function _matches_filter_value(actual, expected::VectorFilterValue)::Bool
+    for candidate in expected
+        actual == candidate && return true
     end
+    return false
 end
 
 """
-filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
+    filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String, FilterValue})
 
-Filter the files in `filelist` based on the keyword-value pairs in `filter`.
+Filter `filelist` in place according to `filters`.
 
-The function modifies `filelist` in place and removes the files that do not meet the filter criteria.
+Each entry in `filters` maps `keyword::String` to either:
+- a scalar value: `Union{String, Bool, Integer, AbstractFloat, Nothing}`
+- or a vector of allowed values: `Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}`
+
+Files not matching all keyword constraints are removed from `filelist`.
 """
-function filter_keywords(filelist::Dict{String, FitsHeader}, filter::Dict{String, Any})
-    for (filename, header) in filelist
+function filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String, FilterValue})
+    for (filename, header) in collect(filelist)
         keep = true
-        for (key, value) in filter
-            if !haskey(header, key) || header_value(header, key) != value
+        for (keyword, expected) in filters
+            if !haskey(header, keyword) || !_matches_filter_value(header_value(header, keyword), expected)
                 keep = false
                 break
             end
         end
-        if !keep
-            delete!(filelist, filename)
-        end
+        keep || delete!(filelist, filename)
     end
-    return
+    return nothing
 end
 
 include("print.jl")

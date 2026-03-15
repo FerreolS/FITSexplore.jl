@@ -135,19 +135,17 @@ using FITSexplore
         headers = FITSexplore.fitsexplore(tmpdir)
         @test haskey(headers, fits_path)
 
-        filtered = FITSexplore.filtercat(headers, "NAXIS", [2, 3])
-        @test haskey(filtered, fits_path)
-
-        exact_filtered = FITSexplore.filtercat(headers, "NAXIS", 2)
-        @test haskey(exact_filtered, fits_path)
-
         dict_copy = copy(headers)
-        FITSexplore.filter_keywords(dict_copy, Dict{String, Any}("NAXIS" => 2))
+        FITSexplore.filter_keyword!(dict_copy, Dict{String, FITSexplore.FilterValue}("NAXIS" => 2))
         @test haskey(dict_copy, fits_path)
 
         dict_copy2 = copy(headers)
-        FITSexplore.filter_keywords(dict_copy2, Dict{String, Any}("NAXIS" => 3))
+        FITSexplore.filter_keyword!(dict_copy2, Dict{String, FITSexplore.FilterValue}("NAXIS" => 3))
         @test !haskey(dict_copy2, fits_path)
+
+        dict_copy3 = copy(headers)
+        FITSexplore.filter_keyword!(dict_copy3, Dict{String, FITSexplore.FilterValue}("NAXIS" => [2, 3]))
+        @test haskey(dict_copy3, fits_path)
     end
 
     @testset "App entrypoint" begin
