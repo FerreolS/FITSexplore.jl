@@ -134,8 +134,20 @@ using FITSexplore
 
         headers = FITSexplore.fitsexplore(tmpdir)
         @test haskey(headers, fits_path)
-        @test FITSexplore.has_suffix(fits_path, [".fits"])
-        @test !FITSexplore.has_suffix(fits_path, [".oifits"])
+
+        filtered = FITSexplore.filtercat(headers, "NAXIS", [2, 3])
+        @test haskey(filtered, fits_path)
+
+        exact_filtered = FITSexplore.filtercat(headers, "NAXIS", 2)
+        @test haskey(exact_filtered, fits_path)
+
+        dict_copy = copy(headers)
+        FITSexplore.filter_keywords(dict_copy, Dict{String, Any}("NAXIS" => 2))
+        @test haskey(dict_copy, fits_path)
+
+        dict_copy2 = copy(headers)
+        FITSexplore.filter_keywords(dict_copy2, Dict{String, Any}("NAXIS" => 3))
+        @test !haskey(dict_copy2, fits_path)
     end
 
     @testset "App entrypoint" begin

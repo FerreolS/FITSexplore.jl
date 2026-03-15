@@ -166,6 +166,45 @@ function has_suffix(chain::AbstractString, patterns::AbstractVector{<:AbstractSt
     return false
 end
 
+"""
+newlist = filtercat(filelist,keyword,value)
+
+Build a `newlist` dictionnary of all files where `fitsheader[keyword] == value`.
+"""
+function filtercat(
+        filelist::Dict{String, FitsHeader},
+        keyword::String,
+        values::Union{Vector{String}, Vector{Bool}, Vector{Int}, Vector{AbstractFloat}}
+    )
+    newlist = Dict{String, FitsHeader}()
+    for value in values
+        merge!(newlist, filtercat(filelist, keyword, value))
+    end
+    return newlist
+end
+
+function filtercat(
+        filelist::Dict{String, FitsHeader},
+        keyword::String,
+        value::Union{String, Bool, Integer, AbstractFloat, Nothing}
+    )
+    try
+        tmp = filter(p -> header_value(p.second, keyword) == value, filelist)
+        return tmp
+    catch
+        return Dict{String, FitsHeader}()
+    end
+end
+
+"""
+    fitsexplore(dir::String) -> Dict{String, FitsHeader}
+
+Scan `dir` (non-recursively) and return a dictionary mapping each supported
+FITS filename to its primary header.
+
+Only regular files with known FITS suffixes are considered, and unreadable
+headers are silently skipped.
+"""
 function fitsexplore(dir::String)
     filedict = Dict{String, FitsHeader}()
     for filename in readdir(dir, join = true)
@@ -277,6 +316,29 @@ end
 function parse_filter(args::Vector{String}, filter::Vector{String})
     return parse_filter(args, filter, Int[])
 end
+"""
+filter_keywords(filelist::Dict{String, FITSHeader}, filter::Dict{String,Any})
+
+Filter the files in `filelist` based on the keyword-value pairs in `filter`.
+
+The function modifies `filelist` in place and removes the files that do not meet the filter criteria.
+"""
+function filter_keywords(filelist::Dict{String, FitsHeader}, filter::Dict{String, Any})
+    for (filename, header) in filelist
+        keep = true
+        for (key, value) in filter
+            if !haskey(header, key) || header_value(header, key) != value
+                keep = false
+                break
+            end
+        end
+        if !keep
+            delete!(filelist, filename)
+        end
+    end
+    return
+end
+
 function comparekeys(key1::AbstractString, key2::AbstractString)
     return key1 == key2
 end
@@ -678,6 +740,15 @@ Options:
 TARGET can be files or (with -r) directories. Defaults to '.'.
 """
 
+"""
+    parse_cli_options(args::Vector{String}) -> CLIOptions
+
+Parse command-line arguments into a `CLIOptions` struct.
+
+Recognized options include listing, header display, stats, plotting, HDU
+selection, keyword extraction, filtering, recursion, help and version.
+Throws an error for unknown options or missing required option arguments.
+"""
 function parse_cli_options(args::Vector{String})::CLIOptions
     targets = String[]
     keywords = String[]
@@ -747,6 +818,15 @@ function parse_cli_options(args::Vector{String})::CLIOptions
 end
 
 
+"""
+    main(args = ARGS) -> Int
+
+Run FITSexplore CLI logic on `args`.
+
+Depending on selected options, this dispatches to list/header/stats/plot,
+keyword extraction, or filtering modes over matching input FITS files.
+Returns `0` on normal completion.
+"""
 function main(args = ARGS)
     opts::CLIOptions = parse_cli_options(Vector{String}(args))
 
