@@ -8,6 +8,7 @@ using FITSexplore
 
     # Build a minimal FITS file with one image HDU.
     writefits!(fits_path, FitsHeader(), reshape(collect(1:4), 2, 2); overwrite = true)
+    fits_path_rel = relpath(fits_path, pwd())
 
     bad_fits_path = joinpath(tmpdir, "broken.fits")
     write(bad_fits_path, "THIS IS NOT A VALID FITS HEADER")
@@ -25,15 +26,15 @@ using FITSexplore
 
         default_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"$fits_path\"])"`
         default_out = read(pipeline(default_cmd, stderr = devnull), String)
-        @test occursin(dirname(fits_path), default_out)
-        @test occursin(basename(fits_path), default_out)
+        @test occursin(dirname(fits_path_rel), default_out)
+        @test occursin(basename(fits_path_rel), default_out)
         @test occursin("EXTNUM\tEXTNAME\tTYPE", default_out)
         @test occursin("1\t\"\"\tPRIMARY", default_out)
 
         list_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--list\", \"$fits_path\"])"`
         list_out = read(pipeline(list_cmd, stderr = devnull), String)
-        @test occursin(dirname(fits_path), list_out)
-        @test occursin(basename(fits_path), list_out)
+        @test occursin(dirname(fits_path_rel), list_out)
+        @test occursin(basename(fits_path_rel), list_out)
         @test occursin("EXTNUM\tEXTNAME\tTYPE", list_out)
         @test occursin("1\t\"\"\tPRIMARY", list_out)
 
@@ -62,12 +63,12 @@ using FITSexplore
         project_root = dirname(@__DIR__)
         kw_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"$fits_path\"])"`
         kw_out = read(pipeline(kw_cmd, stderr = devnull), String)
-        @test occursin(fits_path, kw_out)
+        @test occursin(fits_path_rel, kw_out)
         @test occursin("2", kw_out)
 
         kw_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"--hdu\", \"1\", \"$fits_path\"])"`
         kw_hdu_out = read(pipeline(kw_hdu_cmd, stderr = devnull), String)
-        @test occursin("$(fits_path)#1", kw_hdu_out)
+        @test occursin("$(fits_path_rel)#1", kw_hdu_out)
 
         # Default keyword behavior: missing required keyword suppresses output.
         kw_missing_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
@@ -81,35 +82,43 @@ using FITSexplore
 
         kw_optional_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"--keyword-optional\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
         kw_optional_out = read(pipeline(kw_optional_cmd, stderr = devnull), String)
-        @test occursin(fits_path, kw_optional_out)
+        @test occursin(fits_path_rel, kw_optional_out)
         @test occursin("\t2\t ", kw_optional_out)
 
         only_optional_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword-optional\", \"DOES_NOT_EXIST\", \"$fits_path\"])"`
         only_optional_out = read(pipeline(only_optional_cmd, stderr = devnull), String)
-        @test occursin(fits_path, only_optional_out)
+        @test occursin(fits_path_rel, only_optional_out)
         @test occursin("\t ", only_optional_out)
 
         filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$fits_path\"])"`
         filter_out = read(pipeline(filter_cmd, stderr = devnull), String)
-        @test occursin(fits_path, filter_out)
+        @test occursin(fits_path_rel, filter_out)
 
         filter_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"--hdu\", \"1\", \"$fits_path\"])"`
         filter_hdu_out = read(pipeline(filter_hdu_cmd, stderr = devnull), String)
-        @test occursin("$(fits_path)#1", filter_hdu_out)
+        @test occursin("$(fits_path_rel)#1", filter_hdu_out)
 
         # Malformed FITS files should be skipped instead of crashing.
         bad_kw_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"$bad_fits_path\"])"`
         @test success(pipeline(bad_kw_cmd, stdout = devnull, stderr = devnull))
 
+        bad_kw_warn_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"$bad_fits_path\"])"`
+        bad_kw_stderr = read(pipeline(bad_kw_warn_cmd, stderr = stdout), String)
+        @test isempty(strip(bad_kw_stderr))
+
         bad_filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$bad_fits_path\"])"`
         @test success(pipeline(bad_filter_cmd, stdout = devnull, stderr = devnull))
+
+        bad_filter_quiet_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"$bad_fits_path\"])"`
+        bad_filter_stderr = read(pipeline(bad_filter_quiet_cmd, stderr = stdout), String)
+        @test isempty(strip(bad_filter_stderr))
     end
 
     @testset "selected hdu stats output" begin
         project_root = dirname(@__DIR__)
         stats_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"--hdu\", \"1\", \"$fits_path\"])"`
         stats_hdu_out = read(pipeline(stats_hdu_cmd, stderr = devnull), String)
-        @test occursin(fits_path, stats_hdu_out)
+        @test occursin(fits_path_rel, stats_hdu_out)
         @test occursin("hdu :1", stats_hdu_out)
         @test occursin("size (2, 2)", stats_hdu_out)
     end

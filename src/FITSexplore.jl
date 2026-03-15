@@ -25,18 +25,7 @@ const HeaderScalar = Union{String, Bool, Int, Float64}
     return nothing
 end
 
-@inline function emit_stderr(msg::String)
-    GC.@preserve msg begin
-        ccall(
-            :write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
-            2, pointer(msg), ncodeunits(msg)
-        )
-    end
-    return nothing
-end
-
 @inline emit_stdout_line(msg::String) = emit_stdout(string(msg, "\n"))
-@inline emit_stderr_line(msg::String) = emit_stderr(string(msg, "\n"))
 
 function tab_join(values::Vector{String})::String
     isempty(values) && return ""
@@ -106,7 +95,14 @@ function try_read_header(filename::AbstractString)
     try
         return read_header(filename)
     catch
-        emit_stderr_line(string("Warning: cannot read FITS header, skipping file: ", filename))
+        return nothing
+    end
+end
+
+function try_read_header_silent(filename::AbstractString)
+    try
+        return read_header(filename)
+    catch
         return nothing
     end
 end
@@ -116,12 +112,15 @@ function try_read_header(filename::AbstractString, ext::Integer)
     try
         return read_header(filename, ext_i)
     catch
-        emit_stderr_line(
-            string(
-                "Warning: cannot read FITS header for HDU ", ext_i,
-                ", skipping file: ", filename
-            )
-        )
+        return nothing
+    end
+end
+
+function try_read_header_silent(filename::AbstractString, ext::Integer)
+    ext_i = Int(ext)
+    try
+        return read_header(filename, ext_i)
+    catch
         return nothing
     end
 end
@@ -134,6 +133,47 @@ end
 function format_filename_hdu(filename::String, hdu::Int, include_hdu::Bool)::String
     include_hdu || return filename
     return string(filename, "#", hdu)
+end
+
+function display_path(path::AbstractString)::String
+    p = try
+        normpath(abspath(String(path)))
+    catch
+        return String(path)
+    end
+    cwd = normpath(abspath(pwd()))
+
+    p == cwd && return "."
+
+    p_parts = splitpath(p)
+    cwd_parts = splitpath(cwd)
+
+    # Different roots/volumes: fall back to absolute path.
+    if isempty(p_parts) || isempty(cwd_parts) || p_parts[1] != cwd_parts[1]
+        return p
+    end
+
+    common = 0
+    n = min(length(p_parts), length(cwd_parts))
+    while common < n && p_parts[common + 1] == cwd_parts[common + 1]
+        common += 1
+    end
+
+    rel_parts = String[]
+    for _ in (common + 1):length(cwd_parts)
+        push!(rel_parts, "..")
+    end
+    for i in (common + 1):length(p_parts)
+        push!(rel_parts, p_parts[i])
+    end
+
+    isempty(rel_parts) && return "."
+    sep = Base.Filesystem.path_separator
+    out = rel_parts[1]
+    for i in 2:length(rel_parts)
+        out = string(out, sep, rel_parts[i])
+    end
+    return out
 end
 
 """
@@ -271,9 +311,10 @@ function parse_keywords(
                         for key in keywordsoptional
                             push_optional_header_value!(values, header, key)
                         end
+                        shown = display_path(filename)
                         emit_stdout_line(
                             string(
-                                format_filename_hdu(filename, hdu, use_selected_hdu),
+                                format_filename_hdu(shown, hdu, use_selected_hdu),
                                 "\t",
                                 tab_join(values)
                             )
@@ -324,14 +365,14 @@ function parse_filter(args::Vector{String}, filter::Vector{String}, hdu_indices:
         if isfile(filename)
             if has_suffix(filename, suffixes)
                 for hdu in selected_hdus(hdu_indices)
-                    header = try_read_header(filename, hdu)
+                    header = try_read_header_silent(filename, hdu)
                     if isnothing(header) && hdu == 1
                         header = try_read_keywords_direct(filename, [filter[1]])
                     end
                     isnothing(header) && continue
                     if haskey(header, filter[1])
                         if matches_filter_value(header_value(header, filter[1]), filter[2])
-                            emit_stdout_line(format_filename_hdu(filename, hdu, use_selected_hdu))
+                            emit_stdout_line(format_filename_hdu(display_path(filename), hdu, use_selected_hdu))
                         end
                     end
                 end
@@ -515,6 +556,7 @@ function _dispatch_naxis(filename::String, i::Int, eltype_name::String, naxis::I
 end
 
 function show_stats_mode(filename::String, hdu_indices::Vector{Int})
+    shown = display_path(filename)
     try
         hdus = isempty(hdu_indices) ? FitsFile(filename) do f
                 collect(1:length(f))
@@ -526,7 +568,7 @@ function show_stats_mode(filename::String, hdu_indices::Vector{Int})
             naxis <= 0 && continue
             eltype_name = bitpix_eltype_name(something(header_int_value(hdr, "BITPIX"), -64))
 
-            emit_stdout_line(string(filename, "  hdu :", hdu_label(filename, i)))
+            emit_stdout_line(string(shown, "  hdu :", hdu_label(filename, i)))
             line = try
                 _dispatch_naxis(filename, i, eltype_name, naxis)
             catch
@@ -537,7 +579,7 @@ function show_stats_mode(filename::String, hdu_indices::Vector{Int})
             emit_stdout("\n")
         end
     catch
-        emit_stderr_line(string("Warning: cannot read FITS data, skipping file: ", filename))
+        return nothing
     end
     return nothing
 end
@@ -623,7 +665,6 @@ end
 function plot_image(a::Array{Float64, N}) where {N}
     mat = _plot_matrix(a)
     if isnothing(mat)
-        emit_stderr_line(string("Warning: plotting supports NAXIS=2 or 3, got ", N))
         return nothing
     end
     emit_stdout_line(_ascii_heatmap(_downsample_mean(mat)))
@@ -631,6 +672,7 @@ function plot_image(a::Array{Float64, N}) where {N}
 end
 
 function show_plot_mode(filename::String, hdu_indices::Vector{Int})
+    shown = display_path(filename)
     try
         hdus = isempty(hdu_indices) ? FitsFile(filename) do f
                 collect(1:length(f))
@@ -641,7 +683,7 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
             naxis = something(header_int_value(hdr, "NAXIS"), -1)
             naxis <= 0 && continue
 
-            emit_stdout_line(string(filename, "  hdu :", hdu_label(filename, i)))
+            emit_stdout_line(string(shown, "  hdu :", hdu_label(filename, i)))
 
             if naxis == 2
                 arr = try
@@ -664,7 +706,7 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
             emit_stdout("\n")
         end
     catch
-        emit_stderr_line(string("Warning: cannot read FITS data, skipping file: ", filename))
+        return nothing
     end
     return nothing
 end
@@ -692,12 +734,12 @@ function hdu_name(hdr)::String
 end
 
 function show_list_mode(filename::String, hdu_indices::Vector{Int})
+    shown = display_path(filename)
     selected = try
         isempty(hdu_indices) ? FitsFile(filename) do f
                 collect(1:length(f))
         end : hdu_indices
     catch
-        emit_stderr_line(string("Warning: cannot read FITS file, skipping file: ", filename))
         return nothing
     end
 
@@ -713,8 +755,8 @@ function show_list_mode(filename::String, hdu_indices::Vector{Int})
 
     isempty(hdu_lines) && return nothing
 
-    emit_stdout_line(dirname(filename))
-    emit_stdout_line(string("    ", basename(filename)))
+    emit_stdout_line(dirname(shown))
+    emit_stdout_line(string("    ", basename(shown)))
     emit_stdout_line("        EXTNUM\tEXTNAME\tTYPE")
     for line in hdu_lines
         emit_stdout_line(line)
