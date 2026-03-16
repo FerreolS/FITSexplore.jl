@@ -154,6 +154,33 @@ using FITSexplore
         @test isempty(strip(bad_filter_stderr))
     end
 
+    @testset "set keyword option" begin
+        project_root = dirname(@__DIR__)
+
+        set_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--set\", \"OBJECT\", \"M42\", \"$fits_path\"])"`
+        set_out = read(pipeline(set_cmd, stderr = devnull), String)
+        @test occursin(fits_path_rel, set_out)
+
+        hdr1 = readfits(FitsHeader, fits_path)
+        @test hdr1["OBJECT"].value(String) == "M42"
+
+        set_with_comment_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--set\", \"OBJECT\", \"M43\", \"Target name\", \"$fits_path\"])"`
+        set_with_comment_out = read(pipeline(set_with_comment_cmd, stderr = devnull), String)
+        @test occursin(fits_path_rel, set_with_comment_out)
+
+        hdr2 = readfits(FitsHeader, fits_path)
+        @test hdr2["OBJECT"].value(String) == "M43"
+        @test hdr2["OBJECT"].comment == "Target name"
+
+        FITSexplore.main(["--set", "EXPTIME", "42", fits_path])
+        hdr3 = readfits(FitsHeader, fits_path)
+        @test hdr3["EXPTIME"].value(Integer) == 42
+
+        FITSexplore.main(["--set", "DITHER", "true", fits_path])
+        hdr4 = readfits(FitsHeader, fits_path)
+        @test hdr4["DITHER"].value(Bool)
+    end
+
     @testset "selected hdu stats output" begin
         project_root = dirname(@__DIR__)
         stats_hdu_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"--hdu\", \"1\", \"$fits_path\"])"`
@@ -197,12 +224,16 @@ using FITSexplore
         @test FITSexplore.parse_cli_options(["--", "a.fits"]).targets == ["a.fits"]
         @test FITSexplore.parse_cli_options(["-l", "-r", "x"]).recursive
         @test FITSexplore.parse_cli_options(["-l", "-r", "x"]).list
+        @test FITSexplore.parse_cli_options(["--set", "OBJECT", "M42", "x.fits"]).set == ["OBJECT", "M42"]
+        @test FITSexplore.parse_cli_options(["--set", "OBJECT", "M42", "object name", "x.fits"]).set == ["OBJECT", "M42", "object name"]
 
         @test_throws ErrorException FITSexplore.parse_cli_options(["--unknown"])
         @test_throws ErrorException FITSexplore.parse_cli_options(["-k"])
         @test_throws ErrorException FITSexplore.parse_cli_options(["-K"])
         @test_throws ErrorException FITSexplore.parse_cli_options(["-u"])
         @test_throws ErrorException FITSexplore.parse_cli_options(["-f", "NAXIS"])
+        @test_throws ErrorException FITSexplore.parse_cli_options(["--set", "OBJECT"])
+        @test_throws ErrorException FITSexplore.parse_cli_options(["--set", "OBJECT", "M42"])
         @test_throws ArgumentError FITSexplore.parse_cli_options(["-f", "NAXIS", "2", "-u", "not_an_int"])
 
         # Help/version must return early with empty targets.

@@ -96,6 +96,77 @@ function parse_filter(args::Vector{String}, filter::Vector{String})
     return parse_filter(args, filter, Int[])
 end
 
+function parse_set_value(value::AbstractString)
+    value_lower = lowercase(value)
+    if value_lower == "true" || value_lower == "t"
+        return true
+    elseif value_lower == "false" || value_lower == "f"
+        return false
+    end
+
+    parsed_int = tryparse(Int, value)
+    !isnothing(parsed_int) && return parsed_int
+
+    parsed_float = tryparse(Float64, value)
+    !isnothing(parsed_float) && return parsed_float
+
+    return String(value)
+end
+
+set_hdu_keyword!(hdu, key::String, value::Bool, comment::Nothing) = (AstroFITS.update_key(hdu, key, value); nothing)
+set_hdu_keyword!(hdu, key::String, value::Integer, comment::Nothing) = (AstroFITS.update_key(hdu, key, Int(value)); nothing)
+set_hdu_keyword!(hdu, key::String, value::AbstractFloat, comment::Nothing) = (AstroFITS.update_key(hdu, key, Float64(value)); nothing)
+set_hdu_keyword!(hdu, key::String, value::String, comment::Nothing) = (AstroFITS.update_key(hdu, key, value); nothing)
+
+set_hdu_keyword!(hdu, key::String, value::Bool, comment::String) = (AstroFITS.update_key(hdu, key, value, comment); nothing)
+set_hdu_keyword!(hdu, key::String, value::Integer, comment::String) = (AstroFITS.update_key(hdu, key, Int(value), comment); nothing)
+set_hdu_keyword!(hdu, key::String, value::AbstractFloat, comment::String) = (AstroFITS.update_key(hdu, key, Float64(value), comment); nothing)
+set_hdu_keyword!(hdu, key::String, value::String, comment::String) = (AstroFITS.update_key(hdu, key, value, comment); nothing)
+
+function parse_set(args::Vector{String}, set_spec::Vector{String}, hdu_indices::Vector{Int})
+    length(set_spec) in (2, 3) || error("internal error: set specification must have 2 or 3 arguments")
+
+    key = set_spec[1]
+    value = parse_set_value(set_spec[2])
+    comment = length(set_spec) == 3 ? set_spec[3] : nothing
+    use_selected_hdu = !isempty(hdu_indices)
+
+    for filename in args
+        if isfile(filename)
+            if has_suffix(filename, suffixes)
+                shown = display_path(filename)
+                try
+                    file = openfits(filename, "rw")
+                    try
+                        for hdu in selected_hdus(hdu_indices)
+                            checkbounds(Bool, file, hdu) || continue
+                            hdu_obj = AstroFITS._FitsAnyHDU(file, hdu)
+                            set_hdu_keyword!(hdu_obj, key, value, comment)
+                            emit_stdout_line(format_filename_hdu(shown, hdu, use_selected_hdu))
+                        end
+                    finally
+                        close(file)
+                    end
+                catch
+                    emit_stderr_line(
+                        string(
+                            "warning: failed to set keyword ",
+                            key,
+                            " in ",
+                            shown
+                        )
+                    )
+                end
+            end
+        end
+    end
+    return
+end
+
+function parse_set(args::Vector{String}, set_spec::Vector{String})
+    return parse_set(args, set_spec, Int[])
+end
+
 function comparekeys(key1::AbstractString, key2::AbstractString)
     return key1 == key2
 end
@@ -152,6 +223,7 @@ struct CLIOptions
     keyword::Vector{String}
     keyword_optional::Vector{String}
     filter::Vector{String}
+    set::Vector{String}
 end
 
 const HELP_TEXT = """
@@ -162,18 +234,20 @@ Without any argument, displays name and type of all HDU.
 
 Options:
     -l, --list              List all HDU with their name/type.
-  -d, --header            Print the whole FITS header.
-  -s, --stats             Print statistics of all image HDU.
+    -d, --header            Print the whole FITS header.
+    -s, --stats             Print statistics of all image HDU.
     -p, --plot              Plot image HDU (NAXIS=2 or 3).
-  -u, --hdu N             Select HDU by number (can repeat).
-  -k, --keyword KW        Print value of FITS header KW (can repeat).
-                          Files missing a required KW are not displayed.
-  -K, --keyword-optional KW
-                          Like -k but prints a space if KW is missing.
-  -f, --filter KW VALUE   Print files where header KW = VALUE.
-  -r, --recursive         Recursively explore directories.
-  --version               Print version and exit.
-  -h, --help              Print this message.
+    -u, --hdu N             Select HDU by number (can repeat).
+    -k, --keyword KW        Print value of FITS header KW (can repeat).
+                            Files missing a required KW are not displayed.
+    -K, --keyword-optional KW
+                            Like -k but prints a space if KW is missing.
+    -f, --filter KW VALUE   Print files where header KW = VALUE.
+    --set KW VALUE [COMMENT]
+                            Set or replace FITS keyword KW with VALUE
+    -r, --recursive         Recursively explore directories.
+    --version               Print version and exit.
+    -h, --help              Print this message.
 
 TARGET can be files or (with -r) directories. Defaults to '.'.
 """
@@ -192,6 +266,7 @@ function parse_cli_options(args::Vector{String})::CLIOptions
     keywords = String[]
     kw_opt = String[]
     filter_kv = String[]
+    set_kvc = String[]
     hdu_list = Int[]
     recursive = false
     list = false
@@ -204,10 +279,10 @@ function parse_cli_options(args::Vector{String})::CLIOptions
         a = args[i]
         if a == "--help" || a == "-h"
             emit_stdout(HELP_TEXT)
-            return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[])
+            return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[], String[])
         elseif a == "--version"
-            emit_stdout_line("FITSexplore 0.2")
-            return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[])
+            emit_stdout_line("FITSexplore 0.1.0")
+            return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[], String[])
         elseif a == "--list" || a == "-l"
             list = true
         elseif a == "--header" || a == "-d"
@@ -237,6 +312,26 @@ function parse_cli_options(args::Vector{String})::CLIOptions
             i += 1
             i <= length(args) || error("$a requires two arguments (VALUE missing)")
             push!(filter_kv, args[i])
+        elseif a == "--set"
+            isempty(set_kvc) || error("--set may only be specified once")
+
+            i += 1
+            i <= length(args) || error("$a requires at least two arguments (KW and VALUE)")
+            push!(set_kvc, args[i])
+
+            i += 1
+            i <= length(args) || error("$a requires at least two arguments (VALUE missing)")
+            push!(set_kvc, args[i])
+
+            # Optional COMMENT: only consumed if at least one argument remains after it
+            # so `--set KW VALUE file.fits` is parsed as no-comment with target `file.fits`.
+            if i < length(args)
+                next_arg = args[i + 1]
+                if !startswith(next_arg, "-") && (i + 1 < length(args))
+                    i += 1
+                    push!(set_kvc, args[i])
+                end
+            end
         elseif a == "--"
             # end-of-options separator: remaining args are all positional
             for j in (i + 1):length(args)
@@ -251,6 +346,10 @@ function parse_cli_options(args::Vector{String})::CLIOptions
         i += 1
     end
 
+    if !isempty(set_kvc) && isempty(targets)
+        error("--set requires at least one TARGET")
+    end
+
     isempty(targets) && push!(targets, ".")
-    return CLIOptions(targets, recursive, list, header, stats, plot, hdu_list, keywords, kw_opt, filter_kv)
+    return CLIOptions(targets, recursive, list, header, stats, plot, hdu_list, keywords, kw_opt, filter_kv, set_kvc)
 end

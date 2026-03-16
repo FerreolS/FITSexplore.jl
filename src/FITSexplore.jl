@@ -114,12 +114,13 @@ function main(args = ARGS)
     keywords::Vector{String} = opts.keyword
     kw_opt::Vector{String} = opts.keyword_optional
     filter::Vector{String} = opts.filter
+    set_spec::Vector{String} = opts.set
 
     for arg in opts.targets
         if isdir(arg) && opts.recursive
-            _walk_and_process(arg, keywords, kw_opt, filter, list, head, stats, plot, hdu_indices)
+            _walk_and_process(arg, keywords, kw_opt, filter, set_spec, list, head, stats, plot, hdu_indices)
         else
-            _process_one(arg, keywords, kw_opt, filter, list, head, stats, plot, hdu_indices)
+            _process_one(arg, keywords, kw_opt, filter, set_spec, list, head, stats, plot, hdu_indices)
         end
     end
     return 0
@@ -127,7 +128,7 @@ end
 
 function _walk_and_process(
         root::String,
-        keywords::Vector{String}, kw_opt::Vector{String}, filter::Vector{String},
+        keywords::Vector{String}, kw_opt::Vector{String}, filter::Vector{String}, set_spec::Vector{String},
         list::Bool, head::Bool, stats::Bool, plot::Bool, hdu_indices::Vector{Int}
     )
     # Explicit stack-based traversal — avoids walkdir which uses Channel/Task
@@ -145,7 +146,7 @@ function _walk_and_process(
             if isdir(path)
                 push!(dirs, path)
             elseif has_suffix(path, suffixes)
-                _process_one(path, keywords, kw_opt, filter, list, head, stats, plot, hdu_indices)
+                _process_one(path, keywords, kw_opt, filter, set_spec, list, head, stats, plot, hdu_indices)
             end
         end
     end
@@ -154,11 +155,13 @@ end
 
 function _process_one(
         filename::String,
-        keywords::Vector{String}, kw_opt::Vector{String}, filter::Vector{String},
+        keywords::Vector{String}, kw_opt::Vector{String}, filter::Vector{String}, set_spec::Vector{String},
         list::Bool, head::Bool, stats::Bool, plot::Bool, hdu_indices::Vector{Int}
     )
     (isfile(filename) && has_suffix(filename, suffixes)) || return
-    if !isempty(keywords) || !isempty(kw_opt)
+    if !isempty(set_spec)
+        parse_set([filename], set_spec, hdu_indices)
+    elseif !isempty(keywords) || !isempty(kw_opt)
         parse_keywords([filename], keywords, kw_opt, hdu_indices)
     elseif !isempty(filter)
         parse_filter([filename], filter, hdu_indices)
@@ -174,6 +177,7 @@ end
     keyword_args = ["-k", "NAXIS", "dummy.fits"]
     keyword_optional_args = ["-k", "NAXIS", "-K", "OBJECT", "dummy.fits"]
     filter_args = ["-f", "NAXIS", "2", "dummy.fits"]
+    set_args = ["--set", "NAXIS", "2", "dummy.fits"]
     @compile_workload begin
         redirect_stdout(devnull) do
             redirect_stderr(devnull) do
@@ -181,6 +185,7 @@ end
                     main(keyword_args)
                     main(keyword_optional_args)
                     main(filter_args)
+                    main(set_args)
                     if isfile(sample_file)
                         sample_dir = dirname(sample_file)
                         main([sample_file])
@@ -197,6 +202,8 @@ end
                         main(["-f", "NAXIS", "2", "-r", sample_dir])
                         main(["-k", "NAXIS", "-K", "OBJECT", "-u", "1", sample_file])
                         main(["-f", "NAXIS", "2", "-u", "1", sample_file])
+                        main(["--set", "OBJECT", "M42", sample_file])
+                        main(["--set", "OBJECT", "M42", "Object name", sample_file])
                         main(["-s", sample_file])
                         main(["-s", "-u", "1", sample_file])
                         main(["-p", "-u", "1", sample_file])

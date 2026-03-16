@@ -27,7 +27,7 @@ filter_keyword!(files, Dict("NAXIS" => 2, "EXTNAME" => ["SCI", "PRIMARY"]))
 ### Usage
 
 ```text
-fitsexplore [-l] [-d] [-s] [-k KEYWORD] [-f KEYWORD VALUE] [-u HDU] [-r] [--version] [-h] [TARGET...]
+fitsexplore [-l] [-d] [-s] [-k KEYWORD] [-f KEYWORD VALUE] [--set KEYWORD VALUE [COMMENT]] [-u HDU] [-r] [--version] [-h] [TARGET...]
 ```
 
 Alternative module invocation:
@@ -94,6 +94,7 @@ CUNIT1  = 'deg     '           / Physical units for CDELT1 and CRVAL1
 CUNIT2  = 'deg     '           / Physical units for CDELT2 and CRVAL2
 HDUNAME = 'IMAGE-OI FINAL IMAGE' / unique name for the image within the FITS file
 ```
+
 #### -s, --stats
 
 Display statistical information for image HDU.
@@ -104,7 +105,6 @@ me@host:~$ fitsexplore -s file.fits
 file.fits  hdu :SCI
 size (640, 640)  eltype Float32  mean 16170.782  std 10711.193  median 17808.355  mad 10895.537 min 0.0 max 65535.0
 ```
-
 
 #### -k, --keyword `KEYWORD`
 
@@ -134,15 +134,37 @@ me@host:~$ fitsexplore -f "ESO DPR TYPE"  "DARK" -r /path/to/folder
 /path/to/folder/file8.fits.Z
 ```
 
+#### --set `KEYWORD` `VALUE` `[COMMENT]`
+
+Set or replace FITS header `KEYWORD` with `VALUE` on selected files/HDU.
+
+- `VALUE` is parsed as `Bool` (`true`/`false`), `Int`, `Float64`, or `String`.
+- If `-u/--hdu` is omitted, only HDU `1` is modified.
+- If `COMMENT` is provided, the keyword comment is also updated.
+
+```console
+me@host:~$ fitsexplore --set OBJECT M42 file.fits
+file.fits
+```
+
+```console
+me@host:~$ fitsexplore --set EXPTIME 30.0 "Exposure time (s)" -u 2 file.fits
+file.fits#2
+```
+
+Note: because `COMMENT` is optional and positional, pass it only when a target path follows it.
+For example, `fitsexplore --set OBJECT M42 file.fits` sets no comment, while
+`fitsexplore --set OBJECT M42 "Object name" file.fits` sets comment `Object name`.
+
 ### Other Command-line usage examples
 
-* Adding a keyword value in the filename:
+- Adding a keyword value in the filename:
 
 ```console
 me@host:~$ fitsexplore -k "ESO DPR TYPE" | awk  '{system("mv "$1" "$2"_"$1)}'
 ```
 
-* Displaying the size of files of a given type:
+- Displaying the size of files of a given type:
 
 ```console
 me@host:~$ ls -lh $(fitsexplore -f "ESO DPR TYPE" "DARK" /path/to/folder)
