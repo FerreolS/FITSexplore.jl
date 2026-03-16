@@ -19,6 +19,18 @@ end
 
 @inline emit_stdout_line(msg::String) = emit_stdout(string(msg, "\n"))
 
+@inline function emit_stderr(msg::String)
+    GC.@preserve msg begin
+        ccall(
+            :write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
+            2, pointer(msg), ncodeunits(msg)
+        )
+    end
+    return nothing
+end
+
+@inline emit_stderr_line(msg::String) = emit_stderr(string(msg, "\n"))
+
 function format_filename_hdu(filename::String, hdu::Int, include_hdu::Bool)::String
     include_hdu || return filename
     return string(filename, "#", hdu)
@@ -329,7 +341,7 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
 end
 
 function show_file_mode(filename::String)
-    show_list_mode(filename, Int[])
+    show_list_mode(filename, Int[]; warn_malformed = false)
     return nothing
 end
 
@@ -350,13 +362,14 @@ function hdu_name(hdr)::String
     return ""
 end
 
-function show_list_mode(filename::String, hdu_indices::Vector{Int})
+function show_list_mode(filename::String, hdu_indices::Vector{Int}; warn_malformed::Bool = false)
     shown = display_path(filename)
     selected = try
         isempty(hdu_indices) ? FitsFile(filename) do f
                 collect(1:length(f))
         end : hdu_indices
     catch
+        warn_malformed && emit_stderr_line(string("warning: malformed FITS file: ", shown))
         return nothing
     end
 
@@ -389,7 +402,7 @@ function process_file_mode(filename::String, list::Bool, head::Bool, stats::Bool
     elseif plot
         show_plot_mode(filename, hdu_indices)
     elseif list || !isempty(hdu_indices)
-        show_list_mode(filename, hdu_indices)
+        show_list_mode(filename, hdu_indices; warn_malformed = list)
     else
         show_file_mode(filename)
     end

@@ -38,6 +38,28 @@ using FITSexplore
         @test occursin("EXTNUM\tEXTNAME\tTYPE", list_out)
         @test occursin("1\t\"\"\tPRIMARY", list_out)
 
+        julia_cmd = join(Base.shell_escape_posixly.(Base.julia_cmd().exec), " ")
+        bad_default_expr = "using FITSexplore; FITSexplore.main([$(repr(bad_fits_path))])"
+        bad_default_cmd = string(
+            julia_cmd,
+            " --project=", Base.shell_escape_posixly(project_root),
+            " -e ", Base.shell_escape_posixly(bad_default_expr),
+            " >/dev/null 2>&1"
+        )
+        bad_default_stderr = read(`sh -c $bad_default_cmd`, String)
+        @test isempty(strip(bad_default_stderr))
+
+        bad_list_expr = "using FITSexplore; FITSexplore.main([\"--list\", $(repr(bad_fits_path))])"
+        bad_list_cmd = string(
+            julia_cmd,
+            " --project=", Base.shell_escape_posixly(project_root),
+            " -e ", Base.shell_escape_posixly(bad_list_expr),
+            " 2>&1 >/dev/null"
+        )
+        bad_list_stderr = read(`sh -c $bad_list_cmd`, String)
+        @test occursin("warning: malformed FITS file:", bad_list_stderr)
+        @test occursin(basename(bad_fits_path), bad_list_stderr)
+
         @test_nowarn FITSexplore.main(["--header", fits_path])
     end
 
