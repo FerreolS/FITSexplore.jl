@@ -63,6 +63,24 @@ using FITSexplore
         @test_nowarn FITSexplore.main(["--header", fits_path])
     end
 
+    @testset "recursive mode branches" begin
+        project_root = dirname(@__DIR__)
+
+        recursive_list_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--recursive\", \"$tmpdir\"])"`
+        recursive_list_out = read(pipeline(recursive_list_cmd, stderr = devnull), String)
+        @test occursin(basename(fits_path), recursive_list_out)
+        @test occursin("EXTNUM\tEXTNAME\tTYPE", recursive_list_out)
+
+        recursive_kw_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--keyword\", \"NAXIS\", \"--recursive\", \"$tmpdir\"])"`
+        recursive_kw_out = read(pipeline(recursive_kw_cmd, stderr = devnull), String)
+        @test occursin(basename(fits_path), recursive_kw_out)
+        @test occursin("2", recursive_kw_out)
+
+        recursive_filter_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--filter\", \"NAXIS\", \"2\", \"--recursive\", \"$tmpdir\"])"`
+        recursive_filter_out = read(pipeline(recursive_filter_cmd, stderr = devnull), String)
+        @test occursin(basename(fits_path), recursive_filter_out)
+    end
+
     @testset "stats CLI branches" begin
         project_root = dirname(@__DIR__)
         stats_cmd = `$(Base.julia_cmd()) --project=$project_root -e "using FITSexplore; FITSexplore.main([\"--stats\", \"$fits_path\"])"`
@@ -168,6 +186,28 @@ using FITSexplore
         dict_copy3 = copy(headers)
         FITSexplore.filter_keyword!(dict_copy3, Dict{String, FITSexplore.FilterValue}("NAXIS" => [2, 3]))
         @test haskey(dict_copy3, fits_path)
+
+        dict_copy4 = copy(headers)
+        FITSexplore.filter_keyword!(dict_copy4, Dict{String, FITSexplore.FilterValue}("NAXIS" => [3, 4]))
+        @test isempty(dict_copy4)
+    end
+
+    @testset "parse_cli_options coverage" begin
+        @test FITSexplore.parse_cli_options(String[]).targets == ["."]
+        @test FITSexplore.parse_cli_options(["--", "a.fits"]).targets == ["a.fits"]
+        @test FITSexplore.parse_cli_options(["-l", "-r", "x"]).recursive
+        @test FITSexplore.parse_cli_options(["-l", "-r", "x"]).list
+
+        @test_throws ErrorException FITSexplore.parse_cli_options(["--unknown"])
+        @test_throws ErrorException FITSexplore.parse_cli_options(["-k"])
+        @test_throws ErrorException FITSexplore.parse_cli_options(["-K"])
+        @test_throws ErrorException FITSexplore.parse_cli_options(["-u"])
+        @test_throws ErrorException FITSexplore.parse_cli_options(["-f", "NAXIS"])
+        @test_throws ArgumentError FITSexplore.parse_cli_options(["-f", "NAXIS", "2", "-u", "not_an_int"])
+
+        # Help/version must return early with empty targets.
+        @test isempty(FITSexplore.parse_cli_options(["--help"]).targets)
+        @test isempty(FITSexplore.parse_cli_options(["--version"]).targets)
     end
 
     @testset "App entrypoint" begin

@@ -26,3 +26,6 @@ docs/site/
 # environment.
 Manifest.toml
 benchmark/ttfx.jl
+
+# Generated output from `make install` / JuliaC bundles
+build-juliac/

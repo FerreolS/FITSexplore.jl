@@ -57,6 +57,7 @@ me@host:~$ fitsexplore GRAVI.fits.Z
 #### -l, --list
 
 Explicitly list HDU (same behavior as default mode).
+Malformed FITS files are reported as warnings only in this explicit list mode.
 
 ```console
 me@host:~$ fitsexplore -l file.fits
