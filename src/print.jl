@@ -7,29 +7,11 @@ function tab_join(values::Vector{String})::String
     return out
 end
 
-@inline function emit_stdout(msg::String)
-    GC.@preserve msg begin
-        ccall(
-            :write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
-            1, pointer(msg), ncodeunits(msg)
-        )
-    end
-    return nothing
-end
+print_stdout(msg::String) = print(Core.stdout, msg)
+println_stdout(msg::String) = println(Core.stdout, msg)
 
-@inline emit_stdout_line(msg::String) = emit_stdout(string(msg, "\n"))
-
-@inline function emit_stderr(msg::String)
-    GC.@preserve msg begin
-        ccall(
-            :write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
-            2, pointer(msg), ncodeunits(msg)
-        )
-    end
-    return nothing
-end
-
-@inline emit_stderr_line(msg::String) = emit_stderr(string(msg, "\n"))
+print_stderr(msg::String) = print(Core.stderr, msg)
+println_stderr(msg::String) = println(Core.stderr, msg)
 
 function format_filename_hdu(filename::String, hdu::Int, include_hdu::Bool)::String
     include_hdu || return filename
@@ -78,16 +60,16 @@ function display_path(path::AbstractString)::String
 end
 
 function show_plain(hdr::FitsHeader)
-    emit_stdout_line(string(length(hdr), "-element ", nameof(typeof(hdr)), ":"))
+    println_stdout(string(length(hdr), "-element ", nameof(typeof(hdr)), ":"))
     for card in hdr
         # Keep plain-card formatting while avoiding FitsHeader arrayshow paths in trim-safe builds.
-        emit_stdout_line(sprint(io -> show(io, MIME"text/plain"(), card)))
+        println_stdout(sprint(io -> show(io, MIME"text/plain"(), card)))
     end
     return nothing
 end
 
 function show_plain(x)
-    emit_stdout_line(sprint(show, x))
+    println_stdout(sprint(show, x))
     return nothing
 end
 
@@ -197,15 +179,15 @@ function show_stats_mode(filename::String, hdu_indices::Vector{Int})
             naxis <= 0 && continue
             eltype_name = bitpix_eltype_name(something(header_int_value(hdr, "BITPIX"), -64))
 
-            emit_stdout_line(string(shown, "  hdu :", hdu_label(filename, i)))
+            println_stdout(string(shown, "  hdu :", hdu_label(filename, i)))
             line = try
                 _dispatch_naxis(filename, i, eltype_name, naxis)
             catch
                 continue
             end
             isnothing(line) && continue
-            emit_stdout_line(line)
-            emit_stdout("\n")
+            println_stdout(line)
+            print_stdout("\n")
         end
     catch
         return nothing
@@ -296,7 +278,7 @@ function plot_image(a::Array{Float64, N}) where {N}
     if isnothing(mat)
         return nothing
     end
-    emit_stdout_line(_ascii_heatmap(_downsample_mean(mat)))
+    println_stdout(_ascii_heatmap(_downsample_mean(mat)))
     return nothing
 end
 
@@ -312,7 +294,7 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
             naxis = something(header_int_value(hdr, "NAXIS"), -1)
             naxis <= 0 && continue
 
-            emit_stdout_line(string(shown, "  hdu :", hdu_label(filename, i)))
+            println_stdout(string(shown, "  hdu :", hdu_label(filename, i)))
 
             if naxis == 2
                 arr = try
@@ -332,7 +314,7 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
                 continue
             end
 
-            emit_stdout("\n")
+            print_stdout("\n")
         end
     catch
         return nothing
@@ -369,7 +351,7 @@ function show_list_mode(filename::String, hdu_indices::Vector{Int}; warn_malform
                 collect(1:length(f))
         end : hdu_indices
     catch
-        warn_malformed && emit_stderr_line(string("warning: malformed FITS file: ", shown))
+        warn_malformed && println_stderr(string("warning: malformed FITS file: ", shown))
         return nothing
     end
 
@@ -385,11 +367,11 @@ function show_list_mode(filename::String, hdu_indices::Vector{Int}; warn_malform
 
     isempty(hdu_lines) && return nothing
 
-    emit_stdout_line(dirname(shown))
-    emit_stdout_line(string("    ", basename(shown)))
-    emit_stdout_line("        EXTNUM\tEXTNAME\tTYPE")
+    println_stdout(dirname(shown))
+    println_stdout(string("    ", basename(shown)))
+    println_stdout("        EXTNUM\tEXTNAME\tTYPE")
     for line in hdu_lines
-        emit_stdout_line(line)
+        println_stdout(line)
     end
     return nothing
 end

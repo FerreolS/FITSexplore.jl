@@ -25,7 +25,7 @@ function parse_keywords(
                             push_optional_header_value!(values, header, key)
                         end
                         shown = display_path(filename)
-                        emit_stdout_line(
+                        println_stdout(
                             string(
                                 format_filename_hdu(shown, hdu, use_selected_hdu),
                                 "\t",
@@ -82,7 +82,7 @@ function parse_filter(args::Vector{String}, filter::Vector{String}, hdu_indices:
                     isnothing(header) && continue
                     if haskey(header, filter[1])
                         if matches_filter_value(header_value(header, filter[1]), filter[2])
-                            emit_stdout_line(format_filename_hdu(display_path(filename), hdu, use_selected_hdu))
+                            println_stdout(format_filename_hdu(display_path(filename), hdu, use_selected_hdu))
                         end
                     end
                 end
@@ -142,13 +142,13 @@ function parse_set(args::Vector{String}, set_spec::Vector{String}, hdu_indices::
                             checkbounds(Bool, file, hdu) || continue
                             hdu_obj = AstroFITS._FitsAnyHDU(file, hdu)
                             set_hdu_keyword!(hdu_obj, key, value, comment)
-                            emit_stdout_line(format_filename_hdu(shown, hdu, use_selected_hdu))
+                            println_stdout(format_filename_hdu(shown, hdu, use_selected_hdu))
                         end
                     finally
                         close(file)
                     end
                 catch
-                    emit_stderr_line(
+                    println_stderr(
                         string(
                             "warning: failed to set keyword ",
                             key,
@@ -278,10 +278,10 @@ function parse_cli_options(args::Vector{String})::CLIOptions
     while i <= length(args)
         a = args[i]
         if a == "--help" || a == "-h"
-            emit_stdout(HELP_TEXT)
+            print_stdout(HELP_TEXT)
             return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[], String[])
         elseif a == "--version"
-            emit_stdout_line("FITSexplore 0.1.0")
+            println_stdout("FITSexplore 0.1.0")
             return CLIOptions(String[], false, false, false, false, false, Int[], String[], String[], String[], String[])
         elseif a == "--list" || a == "-l"
             list = true
