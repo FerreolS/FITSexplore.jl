@@ -174,11 +174,10 @@ me@host:~$ ls -lh $(fitsexplore -f "ESO DPR TYPE" "DARK" /path/to/folder)
 
 ### Standard (Julia app)
 
-Install the package and register it as a Julia app:
+Install the package as a Julia app:
 
 ```julia-pkg
-pkg> add https://github.com/FerreolS/FITSexplore.jl
-pkg> app add FITSexplore
+pkg> app add https://github.com/FerreolS/FITSexplore.jl
 ```
 
 Make sure `~/.julia/bin` is in your `PATH`, then run:
@@ -197,7 +196,7 @@ The fully self-contained, relocatable binary bundle can be built with [JuliaC](h
 
 **Prerequisites:** Julia ≥ 1.12.
 
-**Build** 
+**Build**
 The repository includes a `Makefile` to build the relocatable. Once built the binary can be installed under `~/.julia/bundles`, with an executable launcher in `~/.julia/bin`.
 
 From the repository root:
@@ -241,12 +240,13 @@ make install BUNDLE_DIR=build-juliac TRIM_MODE=safe INSTALL_ROOT="$HOME/.julia/b
 ```
 
 ## Performance
+
 macOS, Apple Intel, 20 warm runs via `hyperfine`:
-| Binary | `--help` | `sample.fits` |
+
+|     | --help | more complex call |
 |---|---|---|
-| Relocatable bundle   | ~72 ms | ~104 ms |
-| Julia app  | ~2.8 s | ~2.5 s |
-| **Speedup** | **~38×** | **~25×** |
+| Julia app  | 1.03 s |  1.04 s |
+| Relocatable bundle | 600 ms | 640 ms | 
 
 [license-url]: ./LICENSE.md
 [license-img]: http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
