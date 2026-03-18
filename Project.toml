@@ -11,7 +11,6 @@ AstroFITS = "34e54ef0-c5bf-48ab-9e5d-cca51f35ed77"
 FITSHeaders = "8163a04c-c153-4fb1-a498-3402381ec208"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
-Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [sources]
 AstroFITS = {rev = "main", url = "https://github.com/FerreolS/AstroFITS.jl"}
@@ -22,7 +21,6 @@ AstroFITS = "1.1"
 FITSHeaders = "0.4"
 PrecompileTools = "1"
 Printf = "1"
-Statistics = "1"
 julia = "1.10"
 
 [apps.fitsexplore]

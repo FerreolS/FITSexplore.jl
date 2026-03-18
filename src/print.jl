@@ -1,3 +1,61 @@
+# Custom statistical functions (avoid Statistics dependency for trim-safe binaries)
+
+"""
+    mean_var(arr::AbstractVector{<:Real}) -> (Float64, Float64)
+
+Compute mean and variance in a single pass. Returns (mean, std) with Bessel's correction.
+"""
+function mean_var(arr::AbstractVector{<:Real})
+    n = length(arr)
+    n == 0 && return NaN, NaN
+
+    # First pass: compute mean
+    sum_x = zero(Float64)
+    @inbounds for x in arr
+        sum_x += x
+    end
+    mean_val = sum_x / n
+
+    # Second pass: compute variance (with Bessel's correction for unbiased estimate)
+    sum_sq_dev = zero(Float64)
+    @inbounds for x in arr
+        dev = x - mean_val
+        sum_sq_dev += dev * dev
+    end
+    variance = sum_sq_dev / (n - 1)  # Bessel's correction
+
+    return mean_val, variance
+end
+
+"""
+    mean_along_dims(arr::Array{<:Real}, dims::Int) -> Array{Float64}
+
+Compute mean along a specified dimension.
+"""
+function mean_along_dims(arr::Array{<:Real}, dims::Int)
+    size(arr, dims) == 0 && return similar(arr, Float64)
+
+    # Compute the shape of the output
+    in_shape = size(arr)
+    out_shape = ntuple(i -> i == dims ? 1 : in_shape[i], ndims(arr))
+    out = zeros(Float64, out_shape)
+    counts = zeros(Int, out_shape)
+
+    # Sum values and count
+    @inbounds for idx in CartesianIndices(arr)
+        out_idx = ntuple(i -> i == dims ? 1 : idx[i], ndims(arr))
+        out[out_idx...] += arr[idx]
+        counts[out_idx...] += 1
+    end
+
+    # Divide by counts to get mean
+    @inbounds for i in eachindex(out)
+        out[i] /= counts[i]
+    end
+
+    return out
+end
+
 function tab_join(values::Vector{String})::String
     isempty(values) && return ""
     out = values[1]
@@ -124,15 +182,14 @@ function stats_line(arr::Array{Float64, N}, dims_text::String, eltype_name::Stri
         k += 1
     end
 
-    meanx = Statistics.mean(vals)
-    stdx = Statistics.std(vals; corrected = true, mean = meanx)
+    meanx, varx = mean_var(vals)
     med, madd = _median_and_mad(Float64.(vals))
     minx, maxx = extrema(vals)
 
     return "size " * dims_text *
         "  eltype " * eltype_name *
         "  mean " * string(round(meanx; digits = 4)) *
-        "  std " * string(round(stdx; digits = 4)) *
+        "  std " * string(round(sqrt(varx); digits = 4)) *
         "  median " * string(round(med; digits = 4)) *
         "  mad " * string(round(madd; digits = 4)) *
         " min " * string(round(minx; digits = 4)) *
@@ -215,7 +272,7 @@ function _plot_matrix(a::Array{Float64, N}) where {N}
     return if N == 2
         a
     elseif N == 3
-        dropdims(Statistics.mean(a; dims = 3); dims = 3)
+        dropdims(mean_along_dims(a, 3); dims = 3)
     else
         nothing
     end

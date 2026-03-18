@@ -10,7 +10,7 @@ module FITSexplore
 export fitsexplore,
     filter_keyword!
 
-using AstroFITS, FITSHeaders, PrecompileTools, Printf, Statistics
+using AstroFITS, FITSHeaders, PrecompileTools, Printf
 
 
 const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifits.Z"]
