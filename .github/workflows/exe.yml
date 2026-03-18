@@ -78,7 +78,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download archive artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/exe-archives
 
