@@ -61,7 +61,7 @@ jobs:
           mv "/tmp/${ARCHIVE}" "${GITHUB_WORKSPACE}/${ARCHIVE}"
 
       - name: Upload archive artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fitsexplore-${{ matrix.target }}
           path: fitsexplore-${{ matrix.target }}*.tar.gz
