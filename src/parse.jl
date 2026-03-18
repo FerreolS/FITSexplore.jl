@@ -113,10 +113,10 @@ function parse_set_value(value::AbstractString)
     return String(value)
 end
 
-set_hdu_keyword!(hdu, key::String, value::Bool, comment::Nothing) = (AstroFITS.update_key(hdu, key, value); nothing)
-set_hdu_keyword!(hdu, key::String, value::Integer, comment::Nothing) = (AstroFITS.update_key(hdu, key, Int(value)); nothing)
-set_hdu_keyword!(hdu, key::String, value::AbstractFloat, comment::Nothing) = (AstroFITS.update_key(hdu, key, Float64(value)); nothing)
-set_hdu_keyword!(hdu, key::String, value::String, comment::Nothing) = (AstroFITS.update_key(hdu, key, value); nothing)
+set_hdu_keyword!(hdu, key::String, value::Bool, _comment::Nothing) = (AstroFITS.update_key(hdu, key, value); nothing)
+set_hdu_keyword!(hdu, key::String, value::Integer, _comment::Nothing) = (AstroFITS.update_key(hdu, key, Int(value)); nothing)
+set_hdu_keyword!(hdu, key::String, value::AbstractFloat, _comment::Nothing) = (AstroFITS.update_key(hdu, key, Float64(value)); nothing)
+set_hdu_keyword!(hdu, key::String, value::String, _comment::Nothing) = (AstroFITS.update_key(hdu, key, value); nothing)
 
 set_hdu_keyword!(hdu, key::String, value::Bool, comment::String) = (AstroFITS.update_key(hdu, key, value, comment); nothing)
 set_hdu_keyword!(hdu, key::String, value::Integer, comment::String) = (AstroFITS.update_key(hdu, key, Int(value), comment); nothing)

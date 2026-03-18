@@ -7,8 +7,8 @@
 """
 module FITSexplore
 
-export fitsexplore,
-    filter_keyword!
+export filter_keyword!,
+    fitsexplore
 
 using AstroFITS, FITSHeaders, PrecompileTools, Printf
 
@@ -136,7 +136,7 @@ function _walk_and_process(
     dirs = String[root]
     while !isempty(dirs)
         dir = pop!(dirs)
-        local entries
+        entries = String[]
         try
             entries = readdir(dir; join = true)
         catch
