@@ -246,7 +246,7 @@ macOS, Apple Intel, 20 warm runs via `hyperfine`:
 |     | --help | more complex call |
 |---|---|---|
 | Julia app  | 1.03 s |  1.04 s |
-| Relocatable bundle | 600 ms | 640 ms | 
+| Relocatable bundle | 53 ms | 106 ms | 
 
 [license-url]: ./LICENSE.md
 [license-img]: http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
