@@ -65,7 +65,7 @@ Each entry in `filters` maps `keyword::String` to either:
 
 Files not matching all keyword constraints are removed from `filelist`.
 """
-function filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String, FilterValue})
+function filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String, <:FilterValue})
     for (filename, header) in collect(filelist)
         keep = true
         for (keyword, expected) in filters
