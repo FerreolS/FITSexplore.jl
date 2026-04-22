@@ -17,23 +17,28 @@ const suffixes = [".fits", ".fits.gz", "fits.Z", ".oifits", ".oifits.gz", ".oifi
 
 
 """
-    fitsexplore(dir::String) -> Dict{String, FitsHeader}
+    fitsexplore(dir::String; recursive::Bool = false) -> Dict{String, FitsHeader}
 
-Scan `dir` (non-recursively) and return a dictionary mapping each supported
-FITS filename to its primary header.
+Scan `dir` and return a dictionary mapping each supported FITS filename to its
+primary header.
 
 Only regular files with known FITS suffixes are considered, and unreadable
-headers are silently skipped.
+headers are silently skipped. If `recursive` is `true`, subdirectories are
+visited depth-first.
 """
-function fitsexplore(dir::String)
+function fitsexplore(dir::String; recursive::Bool = false)
     filedict = Dict{String, FitsHeader}()
-    for filename in readdir(dir, join = true)
-        if isfile(filename) && has_suffix(filename, suffixes)
-            header = try_read_header(filename)
-            if !isnothing(header)
-                filedict[filename] = header
+    for (root, _, files) in walkdir(dir; topdown = true)
+        for filename in files
+            path = joinpath(root, filename)
+            if has_suffix(path, suffixes)
+                header = try_read_header(path)
+                if !isnothing(header)
+                    filedict[path] = header
+                end
             end
         end
+        recursive || break
     end
     return filedict
 end
