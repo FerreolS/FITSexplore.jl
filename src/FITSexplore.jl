@@ -60,7 +60,7 @@ function _matches_filter_value(actual, expected::VectorFilterValue)::Bool
 end
 
 """
-    filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String, FilterValue})
+    filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String})
 
 Filter `filelist` in place according to `filters`.
 
@@ -70,18 +70,17 @@ Each entry in `filters` maps `keyword::String` to either:
 
 Files not matching all keyword constraints are removed from `filelist`.
 """
-function filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String, <:FilterValue})
+function filter_keyword!(filelist::Dict{String, FitsHeader}, filters::Dict{String})
     for (filename, header) in collect(filelist)
         keep = true
         for (keyword, expected) in filters
             if !haskey(header, keyword) || !_matches_filter_value(header_value(header, keyword), expected)
                 keep = false
-                break
             end
         end
         keep || delete!(filelist, filename)
     end
-    return nothing
+    return filelist
 end
 
 include("print.jl")
