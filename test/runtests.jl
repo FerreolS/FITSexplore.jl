@@ -217,6 +217,47 @@ using FITSexplore
         dict_copy4 = copy(headers)
         FITSexplore.filter_keyword!(dict_copy4, Dict{String, FITSexplore.FilterValue}("NAXIS" => [3, 4]))
         @test isempty(dict_copy4)
+
+        @testset "print helper functions" begin
+            a = reshape(Float64.(1:6), 2, 3)
+            m1 = FITSexplore.mean_along_dims(a, 1)
+            m2 = FITSexplore.mean_along_dims(a, 2)
+            @test size(m1) == (1, 3)
+            @test size(m2) == (2, 1)
+            @test m1 ≈ reshape([1.5, 3.5, 5.5], 1, 3)
+            @test m2 ≈ reshape([3.0, 4.0], 2, 1)
+
+            empty_a = Array{Float64}(undef, 0, 3)
+            @test isempty(FITSexplore.mean_along_dims(empty_a, 1))
+
+            cwd = pwd()
+            @test FITSexplore.display_path(cwd) == "."
+            @test occursin("..", FITSexplore.display_path(dirname(cwd)))
+            @test occursin("fitsexplore", lowercase(FITSexplore.display_path(joinpath(cwd, "sub", "fitsexplore-child"))))
+
+            stat = FITSexplore.stats_line(reshape(Float64.(1:4), 2, 2), "(2, 2)", "Float64")
+            @test occursin("size (2, 2)", stat)
+            @test occursin("eltype Float64", stat)
+            @test occursin("mean", stat)
+            @test occursin("std", stat)
+        end
+
+        @testset "header_int_value helper" begin
+            struct DummyCard
+                value
+            end
+
+            hdr = Dict{String, DummyCard}(
+                "INT" => DummyCard(() -> 12),
+                "STRINT" => DummyCard(() -> "34"),
+                "BAD" => DummyCard(() -> "x3")
+            )
+
+            @test FITSexplore.header_int_value(hdr, "INT") == 12
+            @test FITSexplore.header_int_value(hdr, "STRINT") == 34
+            @test isnothing(FITSexplore.header_int_value(hdr, "MISSING"))
+            @test isnothing(FITSexplore.header_int_value(hdr, "BAD"))
+        end
     end
 
     @testset "parse_cli_options coverage" begin
@@ -236,9 +277,48 @@ using FITSexplore
         @test_throws ErrorException FITSexplore.parse_cli_options(["--set", "OBJECT", "M42"])
         @test_throws ArgumentError FITSexplore.parse_cli_options(["-f", "NAXIS", "2", "-u", "not_an_int"])
 
+        # Check user-visible messages for malformed specs.
+        err_f = try
+            FITSexplore.parse_cli_options(["-f", "NAXIS"])
+            nothing
+        catch err
+            err
+        end
+        @test err_f isa ErrorException
+        @test occursin("requires two arguments (VALUE missing)", sprint(showerror, err_f))
+
+        err_set = try
+            FITSexplore.parse_cli_options(["--set", "OBJECT", "M42"])
+            nothing
+        catch err
+            err
+        end
+        @test err_set isa ErrorException
+        @test occursin("--set requires at least one TARGET", sprint(showerror, err_set))
+
+        # Type inference checks for helpers used in parser/filters hot paths.
+        @test (@inferred FITSexplore.comparekeys(2, "2")) === true
+        @test (@inferred FITSexplore.comparekeys(false, "false")) === true
+        @test (@inferred FITSexplore.header_value_string(2.5)) == "2.5"
+
         # Help/version must return early with empty targets.
         @test isempty(FITSexplore.parse_cli_options(["--help"]).targets)
         @test isempty(FITSexplore.parse_cli_options(["--version"]).targets)
+    end
+
+    @testset "recursive traversal resilience" begin
+        root = mktempdir()
+        unreadable = joinpath(root, "unreadable")
+        mkpath(unreadable)
+
+        # Trigger readdir catch/continue branch in recursive walk.
+        chmod(unreadable, 0o000)
+        try
+            @test_nowarn FITSexplore.main(["--recursive", root])
+        finally
+            chmod(unreadable, 0o700)
+            rm(root; recursive = true, force = true)
+        end
     end
 
     @testset "App entrypoint" begin
