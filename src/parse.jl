@@ -147,7 +147,8 @@ function parse_set(args::Vector{String}, set_spec::Vector{String}, hdu_indices::
                     finally
                         close(file)
                     end
-                catch
+                catch err
+                    err isa InterruptException && rethrow()
                     println_stderr(
                         string(
                             "warning: failed to set keyword ",

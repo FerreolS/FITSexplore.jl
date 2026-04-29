@@ -65,7 +65,8 @@ function _walk_and_process(
         entries = String[]
         try
             entries = readdir(dir; join = true)
-        catch
+        catch err
+            err isa InterruptException && rethrow()
             continue
         end
         for path in entries

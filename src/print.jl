@@ -239,14 +239,16 @@ function show_stats_mode(filename::String, hdu_indices::Vector{Int})
             println_stdout(string(shown, "  hdu :", hdu_label(filename, i)))
             line = try
                 _dispatch_naxis(filename, i, eltype_name, naxis)
-            catch
+            catch err
+                err isa InterruptException && rethrow()
                 continue
             end
             isnothing(line) && continue
             println_stdout(line)
             print_stdout("\n")
         end
-    catch
+    catch err
+        err isa InterruptException && rethrow()
         return nothing
     end
     return nothing
@@ -356,14 +358,16 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
             if naxis == 2
                 arr = try
                     readfits(Array{Float64, 2}, filename; ext = i)
-                catch
+                catch err
+                    err isa InterruptException && rethrow()
                     continue
                 end
                 plot_image(arr)
             elseif naxis == 3
                 arr = try
                     readfits(Array{Float64, 3}, filename; ext = i)
-                catch
+                catch err
+                    err isa InterruptException && rethrow()
                     continue
                 end
                 plot_image(arr)
@@ -373,7 +377,8 @@ function show_plot_mode(filename::String, hdu_indices::Vector{Int})
 
             print_stdout("\n")
         end
-    catch
+    catch err
+        err isa InterruptException && rethrow()
         return nothing
     end
     return nothing

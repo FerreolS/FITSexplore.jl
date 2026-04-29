@@ -15,7 +15,8 @@ end
 function try_read_header(filename::AbstractString)
     try
         return read_header(filename)
-    catch
+    catch err
+        err isa InterruptException && rethrow()
         return nothing
     end
 end
@@ -24,7 +25,8 @@ function try_read_header(filename::AbstractString, ext::Integer)
     ext_i = Int(ext)
     try
         return read_header(filename, ext_i)
-    catch
+    catch err
+        err isa InterruptException && rethrow()
         return nothing
     end
 end
