@@ -13,8 +13,8 @@ PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [sources]
-AstroFITS = {rev = "main", url = "https://github.com/FerreolS/AstroFITS.jl"}
-FITSHeaders = {rev = "main", url = "https://github.com/FerreolS/FITSHeaders.jl"}
+AstroFITS = {rev = "trimmable", url = "https://github.com/FerreolS/AstroFITS.jl"}
+FITSHeaders = {rev = "main", url = "https://github.com/emmt/FITSHeaders.jl"}
 
 [compat]
 AstroFITS = "1.1"
