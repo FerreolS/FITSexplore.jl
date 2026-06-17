@@ -18,7 +18,7 @@ FITSHeaders = {rev = "main", url = "https://github.com/emmt/FITSHeaders.jl"}
 
 [compat]
 AstroFITS = "1.1"
-FITSHeaders = "0.4"
+FITSHeaders = "0.4, 0.5"
 PrecompileTools = "1"
 Printf = "1"
 julia = "1.10"
