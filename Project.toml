@@ -17,7 +17,7 @@ AstroFITS = {rev = "trimmable", url = "https://github.com/FerreolS/AstroFITS.jl"
 FITSHeaders = {rev = "main", url = "https://github.com/emmt/FITSHeaders.jl"}
 
 [compat]
-AstroFITS = "1.1"
+AstroFITS = "1"
 FITSHeaders = "0.4, 0.5"
 PrecompileTools = "1"
 Printf = "1"
