@@ -16,8 +16,8 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 AstroFITS = {rev = "trimmable", url = "https://github.com/FerreolS/AstroFITS.jl"}
 
 [compat]
-AstroFITS = "1.1"
-FITSHeaders = "0.4"
+AstroFITS = "1"
+FITSHeaders = "0.4, 0.5"
 PrecompileTools = "1"
 Printf = "1"
 julia = "1.10"
