@@ -14,7 +14,6 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [sources]
 AstroFITS = {rev = "trimmable", url = "https://github.com/FerreolS/AstroFITS.jl"}
-FITSHeaders = {rev = "main", url = "https://github.com/emmt/FITSHeaders.jl"}
 
 [compat]
 AstroFITS = "1.1"
