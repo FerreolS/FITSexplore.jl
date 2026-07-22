@@ -3,3 +3,6 @@ Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 AstroFITS = "34e54ef0-c5bf-48ab-9e5d-cca51f35ed77"
 FITSexplore = "8adab973-ac17-4ec6-8b81-43cd6f4779d2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+Aqua = "0.8.16"
